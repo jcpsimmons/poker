@@ -4,7 +4,7 @@
   inputs.flake-utils.url = "github:numtide/flake-utils";
 
   inputs.deno2nix = {
-    url = "github:Xe/deno2nix";
+    url = "github:jcpsimmons/deno2nix";
     inputs.nixpkgs.follows = "nixpkgs";
     inputs.flake-utils.follows = "flake-utils";
   };
@@ -29,7 +29,7 @@
         packages = rec {
           poker = pkgs.deno2nix.mkExecutable {
             pname = "planning-poker";
-            version = "0.2.0";
+            version = "0.2.1";
 
             src = ./.;
             lockfile = ./deno.lock;
@@ -38,6 +38,10 @@
             entrypoint = "./main.ts";
             additionalDenoFlags = "--allow-all";
             # importMap = "./import_map.json";
+
+            additionalBuildSteps = ''
+              cp -r ./public $out/bin
+            '';
           };
         };
       }

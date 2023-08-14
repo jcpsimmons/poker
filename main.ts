@@ -3,6 +3,10 @@ import { LRU } from 'https://deno.land/x/lru@1.0.2/mod.ts';
 
 const { s, c } = parse(Deno.args);
 
+console.log(
+  'Websocket :3333 and client server :3332 unless overriden with -s and -c flags respectively'
+);
+
 const serverPort = s ?? 3333;
 const clientPort = c ?? 3332;
 

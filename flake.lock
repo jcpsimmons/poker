@@ -12,15 +12,15 @@
         ]
       },
       "locked": {
-        "lastModified": 1670562741,
-        "narHash": "sha256-13PVEXOYrbsGn05bIp/WWhG6lREgfcQtRTQU9Jd4g8w=",
-        "owner": "Xe",
+        "lastModified": 1692056646,
+        "narHash": "sha256-Lr+vSeq50+vZYejfK9Q/i5p7CDsvofjQW+WyGk/lILQ=",
+        "owner": "jcpsimmons",
         "repo": "deno2nix",
-        "rev": "db3563f20f74eab34e2c268e2a159325df315085",
+        "rev": "2b4026716f8590c58c0333eefc9e68a78c8784e6",
         "type": "github"
       },
       "original": {
-        "owner": "Xe",
+        "owner": "jcpsimmons",
         "repo": "deno2nix",
         "type": "github"
       }
