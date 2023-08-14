@@ -27,7 +27,7 @@
         };
 
         packages = rec {
-          poker = pkgs.deno2nix.mkExecutable {
+          default = pkgs.deno2nix.mkExecutable {
             pname = "planning-poker";
             version = "0.2.1";
 
