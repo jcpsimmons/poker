@@ -242,8 +242,8 @@
         }
 
         try {
-
-            const ws = new WebSocket("ws://localhost:WEBSOCKET_PORT");
+            const rootUrl = window.location.hostname
+            const ws = new WebSocket(`ws://${rootUrl}:WEBSOCKET_PORT`);
             ws.onopen = () => handleConnected(ws);
             ws.onmessage = (m) => handleMessage(ws, m.data);
             ws.onclose = () => logError("Disconnected from server ...");
