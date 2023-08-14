@@ -1,15 +1,22 @@
+import { parse } from 'https://deno.land/std@0.166.0/flags/mod.ts';
 import { LRU } from 'https://deno.land/x/lru@1.0.2/mod.ts';
-import staticFiles from 'https://deno.land/x/static_files@1.1.6/mod.ts';
 
-// serve static files from 'public' folder
-const serveFiles = (req: Request) =>
-  staticFiles('public')({
-    request: req,
-    respondWith: (r: Response) => r,
-  });
+const { s, c } = parse(Deno.args);
 
-console.log('Static file server listening on 3332');
-Deno.serve({ port: 3332 }, (req) => serveFiles(req));
+const serverPort = s ?? 3333;
+const clientPort = c ?? 3332;
+
+const clientHtml = Deno.readTextFileSync('./public/index.html');
+const portedHtml = clientHtml.replace('WEBSOCKET_PORT', serverPort);
+
+console.log(`Static file server listening on ${clientPort}`);
+Deno.serve(
+  { port: clientPort },
+  (_req) =>
+    new Response(portedHtml, {
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+    })
+);
 
 // websocket server definition
 
@@ -128,8 +135,8 @@ function reqHandler(req: Request) {
   ws.onerror = (e) => handleError(e);
   return response;
 }
-console.log('Websocket listening on 3333');
-Deno.serve({ port: 3333 }, reqHandler);
+console.log(`Websocket listening on ${serverPort}`);
+Deno.serve({ port: serverPort }, reqHandler);
 
 const cachedState = cache.get('state');
 console.log('cachedState', cachedState);

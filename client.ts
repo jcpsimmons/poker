@@ -1,4 +1,8 @@
-<!DOCTYPE html>
+import { html } from 'https://deno.land/x/html@v1.2.0/mod.ts';
+
+const clientPage = (websocketPort:number) => {
+    return html`
+    <!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -243,7 +247,7 @@
 
         try {
 
-            const ws = new WebSocket("ws://localhost:WEBSOCKET_PORT");
+            const ws = new WebSocket("ws://localhost:3333");
             ws.onopen = () => handleConnected(ws);
             ws.onmessage = (m) => handleMessage(ws, m.data);
             ws.onclose = () => logError("Disconnected from server ...");
@@ -325,3 +329,6 @@
 </script>
 
 </html>
+
+    `
+}
