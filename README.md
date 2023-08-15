@@ -2,13 +2,13 @@
 
 A very simple planning poker app that uses websockets.
 
-## Running in Deno
+## installing
 
-`deno run main.ts`
+`nix build github:jcpsimmons/PlanningPoker`
 
-## Building to binary with Nix
+run binary with `./result/bin/poker`
 
-`nix build '.#poker'`
+client will run on 3332, websocket on 3333. if you want to override these ports use the flags -c and/or -s respectively 
 
 ## Running IRL
 
