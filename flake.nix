@@ -27,14 +27,14 @@
         };
 
         packages = rec {
-          default = pkgs.deno2nix.mkExecutable {
+          denoapp = pkgs.deno2nix.mkExecutable {
             pname = "planning-poker";
             version = "0.2.1";
 
             src = ./.;
             lockfile = ./deno.lock;
 
-            output = "poker";
+            output = "denoapp";
             entrypoint = "./main.ts";
             additionalDenoFlags = "--allow-all";
             # importMap = "./import_map.json";
@@ -43,6 +43,9 @@
               cp -r ./public $out/bin
             '';
           };
+          default = pkgs.writeShellScriptBin "poker" ''
+            ${packages.denoapp}/bin/denoapp -h ${packages.denoapp}/bin/public/index.html "$@"
+          '';
         };
       }
     );

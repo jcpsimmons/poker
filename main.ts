@@ -1,7 +1,7 @@
 import { parse } from 'https://deno.land/std@0.166.0/flags/mod.ts';
 import { LRU } from 'https://deno.land/x/lru@1.0.2/mod.ts';
 
-const { s, c } = parse(Deno.args);
+const { s, c, h } = parse(Deno.args);
 
 console.log(
   'Websocket :3333 and client server :3332 unless overriden with -s and -c flags respectively'
@@ -9,8 +9,9 @@ console.log(
 
 const serverPort = s ?? 3333;
 const clientPort = c ?? 3332;
+const htmlOverride = h ?? './public/index.html';
 
-const clientHtml = Deno.readTextFileSync('./public/index.html');
+const clientHtml = Deno.readTextFileSync(htmlOverride);
 const portedHtml = clientHtml.replace('WEBSOCKET_PORT', serverPort);
 
 console.log(`Static file server listening on ${clientPort}`);
