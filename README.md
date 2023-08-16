@@ -2,6 +2,8 @@
 
 A very simple planning poker app that uses websockets.
 
+![1692134911427](https://github.com/jcpsimmons/PlanningPoker/assets/6600962/ac9f8041-931c-4ebb-9232-9a284ab650f0)
+
 ## installing
 
 `nix build github:jcpsimmons/PlanningPoker`
