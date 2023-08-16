@@ -1,5 +1,5 @@
 {
-  description = "Twi's blog, version 2";
+  description = "Simsies Planning Poker";
 
   inputs.flake-utils.url = "github:numtide/flake-utils";
 
