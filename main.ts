@@ -4,11 +4,11 @@ import { LRU } from 'https://deno.land/x/lru@1.0.2/mod.ts';
 const { s, c, h } = parse(Deno.args);
 
 console.log(
-  'Websocket :3333 and client server :3332 unless overriden with -s and -c flags respectively'
+  'Websocket :3000 and client server :3001 unless overriden with -s and -c flags respectively'
 );
 
-const serverPort = s ?? 3333;
-const clientPort = c ?? 3332;
+const serverPort = s ?? 3000;
+const clientPort = c ?? 3001;
 const htmlOverride = h ?? './public/index.html';
 
 const clientHtml = Deno.readTextFileSync(htmlOverride);
