@@ -1,4 +1,4 @@
-build/
-result/
-result
-planningpoker
+tmp
+planning-poker
+pokerserver
+poker

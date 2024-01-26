@@ -1,5 +1,4 @@
-module jsimmons/planning-poker
-
+module jsimmons/poker
 go 1.20
 
 require (

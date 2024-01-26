@@ -2,18 +2,22 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"sync"
 
 	"github.com/gorilla/websocket"
 )
 
+// bascially just nest this sumbitch in a subcommand and write the client code here.
+
 // Client represents a WebSocket client connection.
 type Client struct {
-	conn        *websocket.Conn
-	userId      string
-	curEstimate int32
+	Conn            *websocket.Conn
+	UserID          string
+	CurrentEstimate int32
 }
 
 type MessageType int
@@ -49,7 +53,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		log.Println("Error upgrading to WebSocket:", err)
 		return
 	}
-	client := &Client{conn: conn}
+	client := &Client{Conn: conn}
 
 	mutex.Lock()
 	clients[client] = true
@@ -64,42 +68,73 @@ func handleMessages(client *Client) {
 		mutex.Lock()
 		delete(clients, client)
 		mutex.Unlock()
-		client.conn.Close()
+		client.Conn.Close()
 	}()
 
 	for {
-		_, message, err := client.conn.ReadMessage()
+		_, message, err := client.Conn.ReadMessage()
 		if err != nil {
 			log.Println("Error reading message:", err)
 			break
 		}
 
-		// get json
-		// parse json
+		fmt.Println("message: ", message)
 		messageObject := Message{}
 		json.Unmarshal([]byte(message), &messageObject)
-
+		fmt.Println(messageObject)
 		switch messageObject.Type {
 		case "join":
-			client.userId = messageObject.Payload
-			broadcast([]byte("User "+client.userId+" joined"), client)
+			if messageObject.Payload == "" {
+				log.Println("Error joining: no username specified")
+				break
+			}
+			handleJoin(messageObject.Payload, client)
+			broadcast([]byte("User "+client.UserID+" joined"), client)
 		case "estimate":
-			client.curEstimate = messageObject.Payload
-			broadcast([]byte("User "+client.userId+" estimated "+client.curEstimate), client)
+			numEstimate, err := strconv.ParseInt(messageObject.Payload, 10, 32)
+			if err != nil {
+				log.Println("Error parsing estimate:", err)
+				break
+			}
+			client.CurrentEstimate = int32(numEstimate)
+			broadcast([]byte("User "+client.UserID+" estimated "+messageObject.Payload), client)
 		case "reveal":
-			broadcast([]byte("User "+client.userId+" revealed "+client.curEstimate), client)
+			pointAvg := getPointAverage()
+			pointAvgStr := strconv.FormatInt(int64(pointAvg), 10)
+			broadcast([]byte("User "+client.UserID+" revealed the cards. The estimate is "+pointAvgStr), client)
 		case "reset":
-			broadcast([]byte("User "+client.userId+" reset"), client)
+			removeAllEstimates()
+			broadcast([]byte("User "+client.UserID+" started the next round."), client)
 		case "leave":
-			broadcast([]byte("User "+client.userId+" left"), client)
+			broadcast([]byte("User "+client.UserID+" left."), client)
 		default:
 			log.Println("Unknown message type:", messageObject.Type)
+		}
 	}
 }
 
-func (c *Client) send(message string) {
-	if err := c.conn.WriteMessage(websocket.TextMessage, []byte(message)); err != nil {
-		log.Println("Error writing message:", err)
+func handleJoin(username string, sender *Client) {
+	mutex.Lock()
+	defer mutex.Unlock()
+	sender.UserID = username
+	sender.CurrentEstimate = 0
+}
+
+func getPointAverage() int32 {
+	mutex.Lock()
+	defer mutex.Unlock()
+	var total int32
+	for client := range clients {
+		total += client.CurrentEstimate
+	}
+	return total / int32(len(clients))
+}
+
+func removeAllEstimates() {
+	mutex.Lock()
+	defer mutex.Unlock()
+	for client := range clients {
+		client.CurrentEstimate = 0
 	}
 }
 
@@ -107,13 +142,10 @@ func (c *Client) send(message string) {
 func broadcast(message []byte, sender *Client) {
 	mutex.Lock()
 	defer mutex.Unlock()
-
 	for client := range clients {
-		if client != sender {
-			if err := client.conn.WriteMessage(websocket.TextMessage, message); err != nil {
-				log.Println("Error writing message:", err)
-				break
-			}
-		} 
+		if err := client.Conn.WriteMessage(websocket.TextMessage, message); err != nil {
+			log.Println("Error writing message:", err)
+			break
+		}
 	}
 }
