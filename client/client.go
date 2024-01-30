@@ -5,34 +5,20 @@ import (
 	"log"
 
 	"jsimmons/poker/server"
+	"jsimmons/poker/ui"
 
 	"github.com/gorilla/websocket"
-	"github.com/rivo/tview"
 )
 
 func Init(username string, serverAddr string) {
 	connection := connect(serverAddr)
+	ui.PokerClientMainView(username, serverAddr, connection)
+
 	defer connection.Close()
 
 	// register user
 	sendMessage(server.Join, username, connection)
 
-	app := tview.NewApplication()
-	form := tview.NewForm().
-		AddTextView("Issue", "blah", 10, 10, true, false).
-		AddDropDown("Estimate", []string{"1", "2", "3", "5", "8", "13"}, 0, nil)
-
-	// tview:= tview.NewTextView().SetTitle("Info").SetBorder(true)
-
-	layout := tview.NewFlex().
-		SetDirection(tview.FlexRow).
-		AddItem(form, 0, 1, true).
-		SetBorder(true).
-		SetTitle("Planning Poker")
-
-	if err := app.SetRoot(layout, true).SetFocus(form).Run(); err != nil {
-		log.Fatal(err)
-	}
 }
 
 func connect(serverAddr string) *websocket.Conn {

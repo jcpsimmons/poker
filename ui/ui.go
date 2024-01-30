@@ -1,10 +1,11 @@
 package ui
 
 import (
+	"github.com/gorilla/websocket"
 	"github.com/rivo/tview"
 )
 
-func PokerMainScreen() {
+func PokerClientMainView(username string, serverAddr string, connection *websocket.Conn) {
 	app := tview.NewApplication()
 
 	// Create a flexRow layout that centers the logo and tracks application size
@@ -13,9 +14,9 @@ func PokerMainScreen() {
 	innerFlexColLeft := tview.NewFlex().SetDirection(tview.FlexColumn)
 
 	card := pokerCard(0)
-	estimationForm := estimationForm(app)
 	hostForm := hostForm(app)
-	sessionInfo := sessionInfo("localhost:8080", "jsimmons")
+	estimationForm := estimationForm(app)
+	sessionInfo := sessionInfo(serverAddr, username)
 
 	innerFlexColRight.AddItem(estimationForm, 0, 1, true)
 	innerFlexColRight.AddItem(sessionInfo, 0, 1, false)
@@ -55,8 +56,10 @@ func pokerCard(estimate int32) *tview.Box {
 	return card
 }
 
-func sessionInfo(address string, username string) *tview.Box {
-	sessionDataView := tview.NewTextView().
-		SetText("Address: " + address + "\nUsername: " + username).SetBorder(true).SetTitle("Session Info").SetTitleAlign(tview.AlignLeft)
-	return sessionDataView
+func sessionInfo(address string, username string) *tview.Form {
+	form := tview.NewForm().
+		AddInputField("Host Name", address, 20, nil, nil).
+		AddInputField("Port", username, 20, nil, nil)
+	form.SetBorder(true).SetTitle("Connection Info").SetTitleAlign(tview.AlignLeft)
+	return form
 }
