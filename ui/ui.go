@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"jsimmons/poker/client"
+
 	"github.com/gorilla/websocket"
 	"github.com/rivo/tview"
 )
@@ -14,18 +16,18 @@ func PokerClientMainView(username string, serverAddr string, connection *websock
 	innerFlexColLeft := tview.NewFlex().SetDirection(tview.FlexColumn)
 
 	card := pokerCard(0)
-	hostForm := hostForm(app)
+	hostForm := hostForm(app, connection)
 	estimationForm := estimationForm(app)
 	sessionInfo := sessionInfo(serverAddr, username)
 
 	innerFlexColRight.AddItem(estimationForm, 0, 1, true)
-	innerFlexColRight.AddItem(sessionInfo, 0, 1, false)
+	innerFlexColRight.AddItem(hostForm, 0, 1, false)
 
-	innerFlexColLeft.AddItem(hostForm, 0, 1, false)
+	innerFlexColLeft.AddItem(sessionInfo, 0, 1, false)
 	innerFlexColLeft.AddItem(card, 0, 1, false)
 
 	flexRow.AddItem(innerFlexColLeft, 0, 1, false)
-	flexRow.AddItem(innerFlexColRight, 0, 2, true)
+	flexRow.AddItem(innerFlexColRight, 0, 1, true)
 
 	// Start the application
 	if err := app.SetRoot(flexRow, true).Run(); err != nil {
@@ -34,10 +36,12 @@ func PokerClientMainView(username string, serverAddr string, connection *websock
 
 }
 
-func hostForm(app *tview.Application) *tview.Form {
+func hostForm(app *tview.Application, conn *websocket.Conn) *tview.Form {
+	// how do I keep track of state?
 	form := tview.NewForm().
-		AddInputField("Host Name", "", 20, nil, nil).
-		AddInputField("Port", "", 20, nil, nil)
+		AddInputField("Host Name", "", 20, nil, nil).AddButton("Update Issue", nil).AddButton("Clear Board", func() {
+		client.ResetBoard(conn)
+	})
 	form.SetBorder(true).SetTitle("Host Tools").SetTitleAlign(tview.AlignLeft)
 	return form
 }
@@ -52,7 +56,7 @@ func estimationForm(app *tview.Application) *tview.Form {
 
 func pokerCard(estimate int32) *tview.Box {
 	card := tview.NewTextView().
-		SetText("Estimate: " + string(estimate)).SetBorder(true).SetTitle("Poker Card").SetTitleAlign(tview.AlignLeft)
+		SetText("Estimate: " + string(estimate)).SetBorder(true).SetTitle("Current Round").SetTitleAlign(tview.AlignLeft)
 	return card
 }
 

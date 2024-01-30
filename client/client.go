@@ -32,6 +32,10 @@ func connect(serverAddr string) *websocket.Conn {
 	return c
 }
 
+func ResetBoard(conn *websocket.Conn) {
+	sendMessage(server.Reset, "", conn)
+}
+
 func sendMessage(messageType server.MessageType, payload string, c *websocket.Conn) {
 	message := server.Message{
 		Type:    messageType,
