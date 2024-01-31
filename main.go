@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"jsimmons/poker/client"
 	"jsimmons/poker/server"
+	"jsimmons/poker/ui"
 	"log"
 	"os"
 
@@ -37,7 +37,7 @@ func main() {
 						fmt.Println("Requires username and server address")
 						log.Fatal("Usage: poker client <username> <server address>")
 					} else {
-						client.Init(username, serverAddr)
+						ui.PokerClientMainView(username, serverAddr)
 					}
 					return nil
 				},
