@@ -26,11 +26,10 @@ func PokerClientMainView(username string, serverAddr string) {
 	innerFlexColLeft := tview.NewFlex().SetDirection(tview.FlexColumn)
 
 	modal := modal()
-	card := pokerCard(0)
+	card := pokerCard()
 	hostForm := hostForm(app, connection)
 	estimationForm := estimationForm(app, connection)
 	sessionInfo := sessionInfo(serverAddr, username)
-	//  estimateStory,hostTools
 	innerFlexColRight.AddItem(estimationForm, 0, 1, true)
 	innerFlexColRight.AddItem(hostForm, 0, 1, false)
 
@@ -72,7 +71,7 @@ func PokerClientMainView(username string, serverAddr string) {
 		return event
 	})
 
-	go messageListener(app, connection)
+	go messageListener(app, connection, card)
 
 	// Start the application
 	if err := app.SetRoot(pages, true).Run(); err != nil {
@@ -120,10 +119,13 @@ func estimationForm(app *tview.Application, conn *websocket.Conn) *tview.Form {
 	return form
 }
 
-func pokerCard(estimate int32) *tview.Box {
-	card := tview.NewTextView().
-		SetText("Estimate: " + string(estimate)).SetBorder(true).SetTitle("Current Round").SetTitleAlign(tview.AlignLeft)
-	return card
+func pokerCard() *tview.Table {
+	table := tview.NewTable()
+	table.SetCellSimple(0, 0, "Current Issue:").
+		SetCellSimple(0, 1, "None").
+		SetCellSimple(1, 0, "Estimate:").
+		SetCellSimple(1, 1, "0").SetBorder(true)
+	return table
 }
 
 func modal() *tview.Flex {
@@ -159,7 +161,7 @@ func connect(serverAddr string) *websocket.Conn {
 	return c
 }
 
-func messageListener(app *tview.Application, conn *websocket.Conn) {
+func messageListener(app *tview.Application, conn *websocket.Conn, card *tview.Table) {
 
 	for {
 		_, message, err := conn.ReadMessage()
@@ -167,6 +169,6 @@ func messageListener(app *tview.Application, conn *websocket.Conn) {
 			log.Println("read:", err)
 			return
 		}
-		log.Printf("recv: %s", message)
+		card.SetCellSimple(0, 1, string(message))
 	}
 }
