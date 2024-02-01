@@ -63,6 +63,9 @@ func handleMessages(client *Client) {
 	for {
 		_, message, err := client.Conn.ReadMessage()
 		if err != nil {
+			delete(clients, client)
+			broadcastParticipCount(client)
+			client.Conn.Close()
 			log.Println("Error reading message:", err)
 			break
 		}
