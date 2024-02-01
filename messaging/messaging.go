@@ -31,7 +31,7 @@ func NewIssue(conn *websocket.Conn, issue string) {
 	sendMessage(types.NewIssue, issue, conn)
 }
 
-func Estimate(conn *websocket.Conn, estimate int32) {
+func Estimate(conn *websocket.Conn, estimate int64) {
 	sendMessage(types.Estimate, strconv.Itoa(int(estimate)), conn)
 }
 
