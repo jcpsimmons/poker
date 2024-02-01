@@ -123,8 +123,7 @@ func handleMessages(client *Client) {
 			byteMessage := messaging.MarshallMessage(message)
 			broadcast(byteMessage, client)
 		case types.Reset:
-			removeAllEstimates()
-
+			handleReset(client)
 			currentIssue = ""
 
 		case types.Leave:
@@ -154,11 +153,18 @@ func getPointAverage() int32 {
 	return total / int32(len(clients))
 }
 
-func removeAllEstimates() {
+func handleReset(client *Client) {
 
 	for client := range clients {
 		client.CurrentEstimate = 0
 	}
+
+	clearMessage := types.Message{
+		Type:    types.ClearBoard,
+		Payload: "",
+	}
+	byteMessage := messaging.MarshallMessage(clearMessage)
+	broadcast(byteMessage, client)
 
 	log.Println("Estimates reset.")
 }
