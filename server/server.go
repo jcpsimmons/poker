@@ -4,6 +4,7 @@ import (
 	"jsimmons/poker/messaging"
 	"jsimmons/poker/types"
 	"log"
+	"math"
 	"net/http"
 	"strconv"
 	"sync"
@@ -14,12 +15,13 @@ import (
 type Client struct {
 	Conn            *websocket.Conn
 	UserID          string
-	CurrentEstimate int32
+	CurrentEstimate int64
 }
 
 // clients stores all active client connections.
 var clients = make(map[*Client]bool)
 var currentIssue string = ""
+var hasHost = false
 
 // mutex is used to synchronize access to the clients map.
 var mutex = &sync.Mutex{}
@@ -69,10 +71,8 @@ func handleMessages(client *Client) {
 			log.Println("Error reading message:", err)
 			break
 		}
-
-		log.Println("\n\nraw message received: ", string(message))
+		log.Println("raw message received: ", string(message))
 		messageObject := messaging.UnmarshallMessage(message)
-
 		switch messageObject.Type {
 		case types.Join:
 			if messageObject.Payload == "" {
@@ -96,9 +96,7 @@ func handleMessages(client *Client) {
 
 			broadcastParticipCount(client)
 		case types.NewIssue:
-
 			currentIssue = messageObject.Payload
-
 			message := types.Message{
 				Type:    types.CurrentIssue,
 				Payload: currentIssue,
@@ -111,11 +109,10 @@ func handleMessages(client *Client) {
 				log.Println("Error parsing estimate:", err)
 				break
 			}
-			client.CurrentEstimate = int32(numEstimate)
+			client.CurrentEstimate = numEstimate
 		case types.Reveal:
 			pointAvg := getPointAverage()
-			pointAvgStr := strconv.FormatInt(int64(pointAvg), 10)
-
+			pointAvgStr := strconv.FormatInt(pointAvg, 10)
 			message := types.Message{
 				Type:    types.CurrentEstimate,
 				Payload: pointAvgStr,
@@ -139,18 +136,40 @@ func handleJoin(username string, sender *Client) {
 	sender.CurrentEstimate = 0
 
 	log.Println("User joined: ", username)
-
 }
 
-func getPointAverage() int32 {
+func getPointAverage() int64 {
+	possibleEstimates := []int64{1, 2, 3, 5, 8, 13}
 
-	var total int32
+	var total int64
 	for client := range clients {
 		total += client.CurrentEstimate
 	}
 	log.Println("Estimate average request")
 
-	return total / int32(len(clients))
+	rawAvg := total / int64(len(clients))
+	diffs := make([]int64, 0)
+
+	for i := range possibleEstimates {
+		if possibleEstimates[i] == rawAvg {
+			return possibleEstimates[i]
+		}
+
+		rawDiff := possibleEstimates[i] - rawAvg
+		absDiff := int64(math.Abs(float64(rawDiff)))
+		diffs = append(diffs, absDiff)
+	}
+
+	lowestNum := diffs[0]
+	lowestIdx := 0
+	for i := range diffs {
+		if diffs[i] < lowestNum {
+			lowestNum = diffs[i]
+			lowestIdx = i
+		}
+	}
+
+	return possibleEstimates[lowestIdx]
 }
 
 func handleReset(client *Client) {

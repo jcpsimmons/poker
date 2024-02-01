@@ -6,6 +6,7 @@ import (
 	"jsimmons/poker/ui"
 	"log"
 	"os"
+	"sort"
 
 	"github.com/urfave/cli/v2"
 )
@@ -30,20 +31,32 @@ func main() {
 				Name:    "client",
 				Aliases: []string{"c"},
 				Usage:   "connect to a planning poker instance",
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:    "host",
+						Aliases: []string{"o"},
+						Usage:   "run in host mode",
+						Value:   false,
+					},
+				},
 				Action: func(cCtx *cli.Context) error {
 					username := cCtx.Args().First()
 					serverAddr := cCtx.Args().Get(1)
 					if serverAddr == "" || username == "" {
 						fmt.Println("Requires username and server address")
-						log.Fatal("Usage: poker client <username> <server address>")
+						log.Fatal("Usage: poker client <username> <server address> <-h for host mode>")
 					} else {
-						ui.PokerClientMainView(username, serverAddr)
+						isHost := cCtx.Bool("host")
+						ui.PokerClientMainView(isHost, username, serverAddr)
 					}
 					return nil
 				},
 			},
 		},
 	}
+
+	sort.Sort(cli.FlagsByName(app.Flags))
+	sort.Sort(cli.CommandsByName(app.Commands))
 
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
