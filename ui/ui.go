@@ -123,7 +123,7 @@ func estimationForm(app *tview.Application, conn *websocket.Conn) *tview.Form {
 func pokerCard() *tview.Table {
 	table := tview.NewTable()
 	table.SetCellSimple(0, 0, "Current Issue:").
-		SetCellSimple(0, 1, "blahblah blah blah blah").
+		SetCellSimple(0, 1, "None").
 		SetCellSimple(1, 0, "Estimate:").
 		SetCellSimple(1, 1, "0").
 		SetCellSimple(2, 0, "Participants:").
@@ -186,6 +186,6 @@ func messageListener(app *tview.Application, conn *websocket.Conn, card *tview.T
 			card.SetCellSimple(0, 1, "None")
 			card.SetCellSimple(1, 1, "0")
 		}
-
+		app.Draw()
 	}
 }

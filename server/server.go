@@ -158,7 +158,6 @@ func removeAllEstimates() {
 	}
 
 	log.Println("Estimates reset.")
-
 }
 
 func broadcastParticipCount(client *Client) {
@@ -185,6 +184,7 @@ func broadcast(message []byte, sender *Client) {
 	log.Println("Broadcasting message: ", string(message))
 
 	for client := range clients {
+		log.Println("broadcast to client: ", client.UserID)
 		if err := client.Conn.WriteMessage(websocket.TextMessage, message); err != nil {
 			log.Fatal("Error writing message:", err)
 			break
