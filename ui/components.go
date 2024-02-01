@@ -105,8 +105,8 @@ func generatePokerCard() *tview.Table {
 
 func generateSessionInfo(address string, username string) *tview.Form {
 	form := tview.NewForm().
-		AddInputField("Host Name", address, 20, nil, nil).
-		AddInputField("Port", username, 20, nil, nil)
+		AddInputField("Host Name", address, 0, nil, nil).
+		AddInputField("Username", username, 0, nil, nil)
 	form.SetBorder(true).SetTitle("Connection Info").SetTitleAlign(tview.AlignLeft).SetBorderPadding(1, 1, 1, 1)
 	return form
 }
