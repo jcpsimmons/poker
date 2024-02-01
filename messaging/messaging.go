@@ -6,37 +6,52 @@ import (
 
 	"strconv"
 
-	"jsimmons/poker/server"
+	"jsimmons/poker/types"
 
 	"github.com/gorilla/websocket"
 )
 
 func ResetBoard(conn *websocket.Conn) {
-	sendMessage(server.Reset, "", conn)
+	sendMessage(types.Reset, "", conn)
 }
 
 func JoinSession(conn *websocket.Conn, username string) {
-	sendMessage(server.Join, username, conn)
+	sendMessage(types.Join, username, conn)
 }
 
 func LeaveSession(conn *websocket.Conn) {
-	sendMessage(server.Leave, "", conn)
+	sendMessage(types.Leave, "", conn)
 }
 
 func RevealRound(conn *websocket.Conn) {
-	sendMessage(server.Reveal, "", conn)
+	sendMessage(types.Reveal, "", conn)
 }
 
 func NewIssue(conn *websocket.Conn, issue string) {
-	sendMessage(server.NewIssue, issue, conn)
+	sendMessage(types.NewIssue, issue, conn)
 }
 
 func Estimate(conn *websocket.Conn, estimate int32) {
-	sendMessage(server.Estimate, strconv.Itoa(int(estimate)), conn)
+	sendMessage(types.Estimate, strconv.Itoa(int(estimate)), conn)
 }
 
-func sendMessage(messageType server.MessageType, payload string, c *websocket.Conn) {
-	message := server.Message{
+func UnmarshallMessage(message []byte) types.Message {
+	var messageObject types.Message
+	json.Unmarshal([]byte(message), &messageObject)
+	return messageObject
+}
+
+func MarshallMessage(message types.Message) []byte {
+	byteMessage, err := json.Marshal(message)
+	if err != nil {
+		log.Fatal("write:", err)
+		return nil
+	}
+	return byteMessage
+}
+
+func sendMessage(messageType types.MessageType, payload string, c *websocket.Conn) {
+	message := types.Message{
 		Type:    messageType,
 		Payload: payload,
 	}

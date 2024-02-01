@@ -2,6 +2,7 @@ package ui
 
 import (
 	"jsimmons/poker/messaging"
+	"jsimmons/poker/types"
 	"log"
 	"strconv"
 
@@ -53,7 +54,7 @@ func PokerClientMainView(username string, serverAddr string) {
 			app.SetFocus(estimationForm)
 		}
 
-		if event.Rune() == 'h' {
+		if event.Rune() == 'h' && app.GetFocus() == estimationForm {
 			page := "modal"
 
 			if isModalVisible {
@@ -122,9 +123,12 @@ func estimationForm(app *tview.Application, conn *websocket.Conn) *tview.Form {
 func pokerCard() *tview.Table {
 	table := tview.NewTable()
 	table.SetCellSimple(0, 0, "Current Issue:").
-		SetCellSimple(0, 1, "None").
+		SetCellSimple(0, 1, "blahblah blah blah blah").
 		SetCellSimple(1, 0, "Estimate:").
-		SetCellSimple(1, 1, "0").SetBorder(true)
+		SetCellSimple(1, 1, "0").
+		SetCellSimple(2, 0, "Participants:").
+		SetCellSimple(2, 1, "0").
+		SetBorder(true)
 	return table
 }
 
@@ -169,6 +173,19 @@ func messageListener(app *tview.Application, conn *websocket.Conn, card *tview.T
 			log.Println("read:", err)
 			return
 		}
-		card.SetCellSimple(0, 1, string(message))
+
+		messageStruct := messaging.UnmarshallMessage(message)
+		switch messageStruct.Type {
+		case types.ParticipantCount:
+			card.SetCellSimple(2, 1, messageStruct.Payload)
+		case types.CurrentIssue:
+			card.SetCellSimple(0, 1, messageStruct.Payload)
+		case types.CurrentEstimate:
+			card.SetCellSimple(1, 1, messageStruct.Payload)
+		case types.ClearBoard:
+			card.SetCellSimple(0, 1, "None")
+			card.SetCellSimple(1, 1, "0")
+		}
+
 	}
 }
