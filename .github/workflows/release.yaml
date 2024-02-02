@@ -22,11 +22,10 @@ jobs:
             goos: windows
     steps:
       - uses: actions/checkout@v4
-      - uses: wangyoucao577/go-release-action@v1
+      - uses: wangyoucao577/go-release-action@v1.46
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           goos: ${{ matrix.goos }}
           goarch: ${{ matrix.goarch }}
-          goversion: 'https://dl.google.com/go/go1.13.1.linux-amd64.tar.gz'
           project_path: '.'
           binary_name: 'poker'
