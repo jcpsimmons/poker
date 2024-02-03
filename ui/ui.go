@@ -62,23 +62,6 @@ func PokerClientMainView(isHost bool, username, serverAddr string) {
 		}
 
 		return event
-
-		// // how do I keep track of state?
-		// form := tview.NewForm().
-		// 	AddInputField("Issue", "", 20, nil, nil)
-
-		// form.AddButton("Update Issue", func() {
-		// 	inputEl := form.GetFormItem(0).(*tview.InputField)
-		// 	text := inputEl.GetText()
-		// 	messaging.NewIssue(conn, text)
-		// 	inputEl.SetText("")
-		// }).AddButton("Clear Board", func() {
-		// 	messaging.ResetBoard(conn)
-		// }).AddButton("Reveal Round", func() {
-		// 	messaging.RevealRound(conn)
-		// })
-		// form.SetBorder(true).SetTitle("H"+hotKeyFormat("o")+"st Tools").SetTitleAlign(tview.AlignLeft).
-		// 	SetBorderPadding(1, 1, 1, 1)
 	})
 
 	go messageListener(app, connection, card)
