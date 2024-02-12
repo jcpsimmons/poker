@@ -26,7 +26,6 @@ func generateHostForm(app *tview.Application, conn *websocket.Conn) *tview.TextV
 }
 
 func generateModal(app *tview.Application, conn *websocket.Conn, pages *tview.Pages) *tview.Flex {
-
 	form := tview.NewForm()
 	form.AddInputField("Issue", "", 0, nil, nil).AddButton("Submit", func() {
 		formText := form.GetFormItem(0).(*tview.InputField).GetText()
@@ -92,7 +91,7 @@ func generateEstimationForm(app *tview.Application, conn *websocket.Conn, isHost
 	return flex
 }
 
-func generatePokerCard() *tview.Table {
+func generateScoreCard() *tview.Table {
 	table := tview.NewTable()
 	table.SetCellSimple(0, 0, "Estimate:").
 		SetCellSimple(0, 1, "0").
@@ -104,10 +103,39 @@ func generatePokerCard() *tview.Table {
 	return table
 }
 
-func generateSessionInfo(address string, username string) *tview.Form {
-	form := tview.NewForm().
-		AddInputField("Host Name", address, 0, nil, nil).
-		AddInputField("Username", username, 0, nil, nil)
-	form.SetBorder(true).SetTitle("Connection Info").SetTitleAlign(tview.AlignLeft).SetBorderPadding(1, 1, 1, 1)
-	return form
+func generateCard(score int, user string) *tview.TextView {
+	scoreText := tview.NewTextView().SetText(strconv.Itoa(score) + " - " + user)
+	return scoreText
+}
+
+func generateCards() *tview.Flex {
+	flex := tview.NewFlex().SetDirection(tview.FlexColumnCSS)
+	type vote struct {
+		name  string
+		score int
+	}
+	votes := []vote{{name: "Bill", score: 10}, {name: "Arthur", score: 3}, {name: "John", score: 5}}
+
+	for i := 0; i < len(votes); i++ {
+		card := generateCard(votes[i].score, votes[i].name)
+		flex.AddItem(card, 0, 1, true)
+	}
+	flex.SetTitle("Votes").SetTitleAlign(tview.AlignLeft)
+	flex.SetBorderPadding(1, 1, 1, 1)
+	flex.SetBorder(true)
+	return flex
+}
+
+func generateStatusBar(address string, username string) *tview.Flex {
+	lText := tview.NewTextView()
+	rText := tview.NewTextView()
+	lText.SetDynamicColors(true).SetText("[white::b]Connected to Host: " + address).SetBackgroundColor(tcell.ColorDarkGreen)
+	rText.SetDynamicColors(true).SetText("[white::b]Username: " + username).SetBackgroundColor(tcell.ColorDarkGreen)
+
+	flex := tview.NewFlex().SetDirection(tview.FlexRowCSS)
+	flex.AddItem(lText, 0, 1, false)
+	flex.AddItem(rText, 0, 1, false)
+	flex.SetBackgroundColor(tcell.ColorLimeGreen)
+
+	return flex
 }

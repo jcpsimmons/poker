@@ -16,15 +16,16 @@ func PokerClientMainView(isHost bool, username, serverAddr string) {
 	app := tview.NewApplication()
 
 	// Create a flexRow layout that centers the logo and tracks application size
-	flexRow := tview.NewFlex().SetDirection(tview.FlexRow)
-	innerFlexRowBottom := tview.NewFlex().SetDirection(tview.FlexColumn)
-	innerFlexRowTop := tview.NewFlex().SetDirection(tview.FlexColumn)
+	flexRow := tview.NewFlex().SetDirection(tview.FlexColumnCSS)
+	innerFlexRowBottom := tview.NewFlex().SetDirection(tview.FlexRowCSS)
+	innerFlexRowTop := tview.NewFlex().SetDirection(tview.FlexRowCSS)
 
-	card := generatePokerCard()
+	card := generateScoreCard()
 
+	statusBar := generateStatusBar(serverAddr, username)
 	estimationForm := generateEstimationForm(app, connection, isHost)
-	sessionInfo := generateSessionInfo(serverAddr, username)
-	innerFlexRowBottom.AddItem(estimationForm, 0, 1, true)
+	sessionInfo := generateCards()
+	innerFlexRowBottom.AddItem(estimationForm, 0, 3, true)
 
 	var hostForm *tview.TextView
 	if isHost {
@@ -32,13 +33,18 @@ func PokerClientMainView(isHost bool, username, serverAddr string) {
 		innerFlexRowBottom.AddItem(hostForm, 0, 1, false)
 	}
 
-	innerFlexRowTop.AddItem(sessionInfo, 0, 1, false)
+	outermostFlex := tview.NewFlex().SetDirection(tview.FlexColumnCSS)
+
 	innerFlexRowTop.AddItem(card, 0, 1, false)
+	innerFlexRowTop.AddItem(sessionInfo, 0, 1, false)
 
 	flexRow.AddItem(innerFlexRowTop, 0, 1, false)
-	flexRow.AddItem(innerFlexRowBottom, 0, 2, true)
+	flexRow.AddItem(innerFlexRowBottom, 0, 1, true)
 
-	pages := tview.NewPages().AddPage("main", flexRow, true, true)
+	outermostFlex.AddItem(flexRow, 0, 1, false)
+	outermostFlex.AddItem(statusBar, 1, 0, false)
+
+	pages := tview.NewPages().AddPage("main", outermostFlex, true, true)
 	modal := generateModal(app, connection, pages)
 	pages.AddPage("modal", modal, true, false)
 
