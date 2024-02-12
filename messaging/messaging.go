@@ -41,7 +41,7 @@ func UnmarshallMessage(message []byte) types.Message {
 	return messageObject
 }
 
-func MarshallMessage(message types.Message) []byte {
+func MarshallMessage(message interface{}) []byte {
 	byteMessage, err := json.Marshal(message)
 	if err != nil {
 		log.Fatal("write:", err)
