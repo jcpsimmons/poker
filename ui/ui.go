@@ -56,8 +56,9 @@ func PokerClientMainView(isHost bool, username, serverAddr string) {
 			app.Stop()
 		}
 
+		app.SetFocus(estimationForm)
+
 		if isHost && curTopPage != "modal" {
-			app.SetFocus(estimationForm)
 			switch event.Rune() {
 			case 'u':
 				messaging.ResetBoard(connection)
