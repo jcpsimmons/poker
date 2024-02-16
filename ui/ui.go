@@ -24,7 +24,7 @@ func PokerClientMainView(isHost bool, username, serverAddr string) {
 
 	statusBar := generateStatusBar(serverAddr, username)
 	estimationForm := generateEstimationForm(app, connection, isHost)
-	votes := generateCards()
+	votes := generateVotes()
 	innerFlexRowBottom.AddItem(estimationForm, 0, 1, true)
 
 	var hostTools *tview.TextView
@@ -72,7 +72,7 @@ func PokerClientMainView(isHost bool, username, serverAddr string) {
 		return event
 	})
 
-	go messageListener(app, connection, currentIssue)
+	go messageListener(app, connection, currentIssue, votes)
 
 	// Start the application
 	if err := app.SetRoot(pages, true).Run(); err != nil {

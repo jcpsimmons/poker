@@ -109,23 +109,14 @@ func generateScoreCard() *tview.Table {
 	return table
 }
 
-func generateCard(score int, user string) *tview.TextView {
-	scoreText := tview.NewTextView().SetText(strconv.Itoa(score) + " - " + user)
+func generateVoteText(score string, user string) *tview.TextView {
+	scoreText := tview.NewTextView().SetText(score + " - " + user)
 	return scoreText
 }
 
-func generateCards() *tview.Flex {
+func generateVotes() *tview.Flex {
 	flex := tview.NewFlex()
-	type vote struct {
-		name  string
-		score int
-	}
-	votes := []vote{{name: "Bill", score: 10}, {name: "Arthur", score: 3}, {name: "John", score: 5}, {name: "Bill", score: 10}, {name: "Arthur", score: 3}, {name: "John", score: 5}, {name: "Bill", score: 10}, {name: "Arthur", score: 3}, {name: "John", score: 5}, {name: "Bill", score: 10}, {name: "Arthur", score: 3}, {name: "John", score: 5}}
 
-	for i := 0; i < len(votes); i++ {
-		card := generateCard(votes[i].score, votes[i].name)
-		flex.AddItem(card, 0, 1, true)
-	}
 	flex.SetDirection(tview.FlexColumnCSS).SetTitle("Votes").SetTitleAlign(tview.AlignLeft)
 	flex.SetBorderPadding(1, 1, 1, 1)
 	flex.SetBorder(true)
