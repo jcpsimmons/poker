@@ -2,7 +2,6 @@ package ui
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 
 	"github.com/jcpsimmons/poker/types"
@@ -43,8 +42,6 @@ func messageListener(app *tview.Application, conn *websocket.Conn, card *tview.T
 			if err := json.Unmarshal(message, &messageStruct); err != nil {
 				panic(err)
 			}
-			fmt.Println(messageStruct.Payload)
-			// ui changes
 			votes.Clear()
 			for _, estimateData := range messageStruct.Payload.Estimates {
 				user := estimateData.User
