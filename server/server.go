@@ -114,9 +114,12 @@ func handleMessages(client *Client) {
 		case types.Reveal:
 			pointAvg := getPointAverage()
 			pointAvgStr := strconv.FormatInt(pointAvg, 10)
-			message := types.Message{
-				Type:    types.CurrentEstimate,
-				Payload: pointAvgStr,
+			message := types.RevealMessage{
+				Type: types.RevealData,
+				Payload: types.RevealPayload{
+					PointAvg:  pointAvgStr,
+					Estimates: getFormattedRevealData(),
+				},
 			}
 			byteMessage := messaging.MarshallMessage(message)
 			broadcast(byteMessage, client)
@@ -137,6 +140,19 @@ func handleJoin(username string, sender *Client) {
 	sender.CurrentEstimate = 0
 
 	log.Println("User joined: ", username)
+}
+
+func getFormattedRevealData() []types.UserEstimate {
+
+	estimates := make([]types.UserEstimate, 0)
+
+	for client := range clients {
+		estimates = append(estimates, types.UserEstimate{
+			User:     client.UserID,
+			Estimate: strconv.FormatInt(client.CurrentEstimate, 10),
+		})
+	}
+	return estimates
 }
 
 func getPointAverage() int64 {

@@ -13,7 +13,7 @@ import (
 )
 
 func generateHostForm(app *tview.Application, conn *websocket.Conn) *tview.TextView {
-	hostMethods := []string{"Update Issue", "Reveal Round", "Clear Board"}
+	hostMethods := []string{"Update Issue", "Reveal Round"}
 	for i, method := range hostMethods {
 		firstChar := hotKeyFormat(method[0:1])
 		rest := method[1:]
@@ -27,12 +27,18 @@ func generateHostForm(app *tview.Application, conn *websocket.Conn) *tview.TextV
 
 func generateModal(app *tview.Application, conn *websocket.Conn, pages *tview.Pages) *tview.Flex {
 	form := tview.NewForm()
-	form.AddInputField("Issue", "", 0, nil, nil).AddButton("Submit", func() {
-		formText := form.GetFormItem(0).(*tview.InputField).GetText()
-		messaging.NewIssue(conn, formText)
-		pages.HidePage("modal")
-	}).AddButton("Cancel", func() {
-		pages.HidePage("modal")
+	form.AddInputField("Issue", "", 0, nil, nil)
+	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEscape {
+			pages.HidePage("modal")
+			return nil
+		}
+		if event.Key() == tcell.KeyEnter {
+			formText := form.GetFormItem(0).(*tview.InputField).GetText()
+			messaging.NewIssue(conn, formText)
+			pages.HidePage("modal")
+		}
+		return event
 	})
 
 	form.SetBorder(true).SetTitle("New Issue").SetTitleAlign(tview.AlignLeft).SetBorderPadding(1, 1, 1, 1).SetBackgroundColor(tcell.ColorLimeGreen)
@@ -52,10 +58,10 @@ func generateEstimationForm(app *tview.Application, conn *websocket.Conn, isHost
 	listOptions := map[int64]string{
 		1:  "To do list item",
 		2:  "Part of a day",
-		3:  "full day",
+		3:  "Full day",
 		5:  "2-3 days + communication",
-		8:  "a week",
-		13: "this ticket needs broken down",
+		8:  "A week",
+		13: "This ticket needs broken down",
 	}
 	keys := make([]int64, 0, len(listOptions))
 	for k := range listOptions {
@@ -103,24 +109,15 @@ func generateScoreCard() *tview.Table {
 	return table
 }
 
-func generateCard(score int, user string) *tview.TextView {
-	scoreText := tview.NewTextView().SetText(strconv.Itoa(score) + " - " + user)
+func generateVoteText(score string, user string) *tview.TextView {
+	scoreText := tview.NewTextView().SetText(score + " - " + user)
 	return scoreText
 }
 
-func generateCards() *tview.Flex {
-	flex := tview.NewFlex().SetDirection(tview.FlexColumnCSS)
-	type vote struct {
-		name  string
-		score int
-	}
-	votes := []vote{{name: "Bill", score: 10}, {name: "Arthur", score: 3}, {name: "John", score: 5}}
+func generateVotes() *tview.Flex {
+	flex := tview.NewFlex()
 
-	for i := 0; i < len(votes); i++ {
-		card := generateCard(votes[i].score, votes[i].name)
-		flex.AddItem(card, 0, 1, true)
-	}
-	flex.SetTitle("Votes").SetTitleAlign(tview.AlignLeft)
+	flex.SetDirection(tview.FlexColumnCSS).SetTitle("Votes").SetTitleAlign(tview.AlignLeft)
 	flex.SetBorderPadding(1, 1, 1, 1)
 	flex.SetBorder(true)
 	return flex

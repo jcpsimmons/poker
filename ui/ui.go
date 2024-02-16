@@ -20,28 +20,29 @@ func PokerClientMainView(isHost bool, username, serverAddr string) {
 	innerFlexRowBottom := tview.NewFlex().SetDirection(tview.FlexRowCSS)
 	innerFlexRowTop := tview.NewFlex().SetDirection(tview.FlexRowCSS)
 
-	card := generateScoreCard()
+	currentIssue := generateScoreCard()
 
 	statusBar := generateStatusBar(serverAddr, username)
 	estimationForm := generateEstimationForm(app, connection, isHost)
-	sessionInfo := generateCards()
-	innerFlexRowBottom.AddItem(estimationForm, 0, 3, true)
+	votes := generateVotes()
+	innerFlexRowBottom.AddItem(estimationForm, 0, 1, true)
 
-	var hostForm *tview.TextView
+	var hostTools *tview.TextView
 	if isHost {
-		hostForm = generateHostForm(app, connection)
-		innerFlexRowBottom.AddItem(hostForm, 0, 1, false)
+		hostTools = generateHostForm(app, connection)
+		innerFlexRowTop.AddItem(hostTools, 0, 1, false)
 	}
 
 	outermostFlex := tview.NewFlex().SetDirection(tview.FlexColumnCSS)
 
-	innerFlexRowTop.AddItem(card, 0, 1, false)
-	innerFlexRowTop.AddItem(sessionInfo, 0, 1, false)
+	innerFlexRowTop.AddItem(currentIssue, 0, 1, false)
 
 	flexRow.AddItem(innerFlexRowTop, 0, 1, false)
-	flexRow.AddItem(innerFlexRowBottom, 0, 1, true)
+	flexRow.AddItem(innerFlexRowBottom, 0, 2, true)
 
-	outermostFlex.AddItem(flexRow, 0, 1, false)
+	scoreboardFlex := tview.NewFlex().SetDirection(tview.FlexRowCSS).AddItem(flexRow, 0, 3, true).AddItem(votes, 0, 1, false)
+
+	outermostFlex.AddItem(scoreboardFlex, 0, 1, false)
 	outermostFlex.AddItem(statusBar, 1, 0, false)
 
 	pages := tview.NewPages().AddPage("main", outermostFlex, true, true)
@@ -56,12 +57,13 @@ func PokerClientMainView(isHost bool, username, serverAddr string) {
 		}
 
 		if isHost && curTopPage != "modal" {
+			app.SetFocus(estimationForm)
 			switch event.Rune() {
 			case 'u':
-				pages.ShowPage("modal")
-				return nil
-			case 'c':
 				messaging.ResetBoard(connection)
+				pages.ShowPage("modal")
+				modal.GetItem(1).(*tview.Flex).GetItem(1).(*tview.Form).GetFormItem(0).(*tview.InputField).SetText("")
+				return nil
 			case 'r':
 				messaging.RevealRound(connection)
 			}
@@ -70,7 +72,7 @@ func PokerClientMainView(isHost bool, username, serverAddr string) {
 		return event
 	})
 
-	go messageListener(app, connection, card)
+	go messageListener(app, connection, currentIssue, votes)
 
 	// Start the application
 	if err := app.SetRoot(pages, true).Run(); err != nil {
