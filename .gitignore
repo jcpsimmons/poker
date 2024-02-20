@@ -5,3 +5,5 @@ poker
 .DS_Store
 .vscode
 tmp
+
+dist/
