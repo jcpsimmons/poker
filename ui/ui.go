@@ -56,14 +56,19 @@ func PokerClientMainView(isHost bool, username, serverAddr string) {
 			app.Stop()
 		}
 
-		app.SetFocus(estimationForm)
+		if !isHost {
+			app.SetFocus(estimationForm)
+		}
 
 		if isHost && curTopPage != "modal" {
+			app.SetFocus(estimationForm)
 			switch event.Rune() {
 			case 'u':
 				messaging.ResetBoard(connection)
 				pages.ShowPage("modal")
-				modal.GetItem(1).(*tview.Flex).GetItem(1).(*tview.Form).GetFormItem(0).(*tview.InputField).SetText("")
+				textInput := modal.GetItem(1).(*tview.Flex).GetItem(1).(*tview.Form).GetFormItem(0).(*tview.InputField)
+				textInput.SetText("")
+				app.SetFocus(textInput)
 				return nil
 			case 'r':
 				messaging.RevealRound(connection)

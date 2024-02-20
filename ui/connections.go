@@ -49,7 +49,7 @@ func messageListener(app *tview.Application, conn *websocket.Conn, card *tview.T
 				entry := generateVoteText(score, user)
 				votes.AddItem(entry, 0, 1, true)
 			}
-
+			card.SetCellSimple(0, 1, messageStruct.Payload.PointAvg)
 		} else {
 			var messageStruct types.Message
 			if err := json.Unmarshal(message, &messageStruct); err != nil {
@@ -61,8 +61,6 @@ func messageListener(app *tview.Application, conn *websocket.Conn, card *tview.T
 				card.SetCellSimple(1, 1, messageStruct.Payload)
 			case types.CurrentIssue:
 				card.SetTitle("Current Issue: " + messageStruct.Payload)
-			case types.CurrentEstimate:
-				card.SetCellSimple(0, 1, messageStruct.Payload)
 			case types.ClearBoard:
 				card.SetTitle("Current Issue: None")
 				card.SetCellSimple(0, 1, "0")

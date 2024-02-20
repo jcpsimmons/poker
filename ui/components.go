@@ -13,7 +13,7 @@ import (
 )
 
 func generateHostForm(app *tview.Application, conn *websocket.Conn) *tview.TextView {
-	hostMethods := []string{"Update Issue", "Reveal Round"}
+	hostMethods := []string{"update issue", "reveal round"}
 	for i, method := range hostMethods {
 		firstChar := hotKeyFormat(method[0:1])
 		rest := method[1:]
@@ -54,7 +54,6 @@ func generateModal(app *tview.Application, conn *websocket.Conn, pages *tview.Pa
 }
 
 func generateEstimationForm(app *tview.Application, conn *websocket.Conn, isHost bool) *tview.Flex {
-
 	listOptions := map[int64]string{
 		1:  "To do list item",
 		2:  "Part of a day",
@@ -72,11 +71,28 @@ func generateEstimationForm(app *tview.Application, conn *websocket.Conn, isHost
 
 	list := tview.NewList()
 
+	lflex := tview.NewFlex()
+
+	info := tview.NewTextView().SetDynamicColors(true).SetText("[blue:gray:bi]Instructions\n\n[::-][::i]Use UP and DOWN arrows to select an estimate.\n\nPress ENTER to submit.")
+	info.SetTitle("Instructions").SetTitleAlign(tview.AlignLeft).SetBorderPadding(0, 0, 1, 1)
+
+	statusUpdates := tview.NewTextView()
+	statusUpdates.SetDynamicColors(true).SetBorder(true).SetTitle("Log").SetTitleAlign(tview.AlignLeft).SetBorderPadding(1, 1, 1, 1)
+
+	lflex.AddItem(info, 0, 1, false)
+	lflex.AddItem(statusUpdates, 0, 1, true)
+	lflex.SetDirection(tview.FlexColumnCSS)
+	lflex.SetBorderPadding(0, 0, 1, 2)
+
+	flex := tview.NewFlex().AddItem(lflex, 0, 1, false).AddItem(list, 0, 1, true)
+
 	for i := range keys {
 		key := keys[i]
 		value := listOptions[int64(key)]
 		list.AddItem(value, strconv.Itoa(int(key)), 0, func() {
 			messaging.Estimate(conn, int64(key))
+			curStatus := statusUpdates.GetText(true)
+			statusUpdates.SetText("Voted " + strconv.Itoa(int(key)) + " Points" + "\n" + curStatus)
 		})
 	}
 
@@ -88,10 +104,6 @@ func generateEstimationForm(app *tview.Application, conn *websocket.Conn, isHost
 
 	list.SetTitle("Estimate Story").SetTitleAlign(titleAlign)
 
-	info := tview.NewTextView().SetDynamicColors(true).SetText("[blue:gray:bi]Instructions\n\n[::-][::i]Use UP and DOWN arrows to select an estimate.\n\nPress ENTER to submit.")
-	info.SetTitle("Instructions").SetTitleAlign(tview.AlignLeft).SetBorderPadding(0, 0, 1, 1)
-
-	flex := tview.NewFlex().AddItem(info, 0, 1, false).AddItem(list, 0, 1, true)
 	flex.SetBorder(true)
 	flex.SetTitle("Estimation").SetTitleAlign(tview.AlignLeft).SetBorderPadding(1, 1, 1, 1)
 	return flex
@@ -110,7 +122,11 @@ func generateScoreCard() *tview.Table {
 }
 
 func generateVoteText(score string, user string) *tview.TextView {
-	scoreText := tview.NewTextView().SetText(score + " - " + user)
+	scoreVal := score
+	if scoreVal == "0" {
+		scoreVal = "NV"
+	}
+	scoreText := tview.NewTextView().SetText(scoreVal + " - " + user)
 	return scoreText
 }
 

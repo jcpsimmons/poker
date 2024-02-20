@@ -159,12 +159,21 @@ func getPointAverage() int64 {
 	possibleEstimates := []int64{1, 2, 3, 5, 8, 13}
 
 	var total int64
+	didntEstimate := 0
 	for client := range clients {
-		total += client.CurrentEstimate
+		est := client.CurrentEstimate
+		total += est
+		if est == 0 {
+			didntEstimate++
+		}
 	}
 	log.Println("Estimate average request")
 
-	rawAvg := total / int64(len(clients))
+	clientsLessAbsentia := len(clients) - didntEstimate
+	if clientsLessAbsentia == 0 {
+		return 0
+	}
+	rawAvg := total / int64(clientsLessAbsentia)
 	diffs := make([]int64, 0)
 
 	for i := range possibleEstimates {
