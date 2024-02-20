@@ -122,7 +122,11 @@ func generateScoreCard() *tview.Table {
 }
 
 func generateVoteText(score string, user string) *tview.TextView {
-	scoreText := tview.NewTextView().SetText(score + " - " + user)
+	scoreVal := score
+	if scoreVal == "0" {
+		scoreVal = "NV"
+	}
+	scoreText := tview.NewTextView().SetText(scoreVal + " - " + user)
 	return scoreText
 }
 

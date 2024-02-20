@@ -55,6 +55,11 @@ func PokerClientMainView(isHost bool, username, serverAddr string) {
 		if event.Rune() == 'q' {
 			app.Stop()
 		}
+
+		if !isHost {
+			app.SetFocus(estimationForm)
+		}
+
 		if isHost && curTopPage != "modal" {
 			app.SetFocus(estimationForm)
 			switch event.Rune() {
