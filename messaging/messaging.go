@@ -1,9 +1,10 @@
 package messaging
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"log"
-
 	"strconv"
 
 	"github.com/jcpsimmons/poker/types"
@@ -15,8 +16,26 @@ func ResetBoard(conn *websocket.Conn) {
 	sendMessage(types.Reset, "", conn)
 }
 
-func JoinSession(conn *websocket.Conn, username string) {
-	sendMessage(types.Join, username, conn)
+func JoinSession(conn *websocket.Conn, username string, isHost bool) {
+	joinMsg := types.JoinMessage{
+		Type: types.Join,
+		Payload: types.JoinPayload{
+			Username: username,
+			IsHost:   isHost,
+		},
+	}
+
+	byteMessage, err := json.Marshal(joinMsg)
+	if err != nil {
+		log.Fatal("Error marshalling join message:", err)
+		return
+	}
+
+	err = conn.WriteMessage(websocket.TextMessage, byteMessage)
+	if err != nil {
+		log.Fatal("Error sending join message:", err)
+		return
+	}
 }
 
 func LeaveSession(conn *websocket.Conn) {
@@ -72,6 +91,41 @@ func sendMessage(messageType types.MessageType, payload string, c *websocket.Con
 	err = c.WriteMessage(websocket.TextMessage, byteMessage)
 	if err != nil {
 		log.Fatal("write:", err)
+		return
+	}
+}
+
+// GenerateRequestID generates a unique request ID for idempotency
+func GenerateRequestID() string {
+	bytes := make([]byte, 16)
+	if _, err := rand.Read(bytes); err != nil {
+		log.Printf("Error generating request ID: %v", err)
+		return ""
+	}
+	return hex.EncodeToString(bytes)
+}
+
+// SendIssueConfirm sends an issue confirmation to the server
+func SendIssueConfirm(conn *websocket.Conn, identifier string, queueIndex int, isCustom bool) {
+	confirmMsg := types.IssueConfirmMessage{
+		Type: types.MessageIssueConfirm,
+		Payload: types.IssueConfirmPayload{
+			RequestID:  GenerateRequestID(),
+			Identifier: identifier,
+			QueueIndex: queueIndex,
+			IsCustom:   isCustom,
+		},
+	}
+
+	byteMessage, err := json.Marshal(confirmMsg)
+	if err != nil {
+		log.Fatal("Error marshalling issue confirm:", err)
+		return
+	}
+
+	err = conn.WriteMessage(websocket.TextMessage, byteMessage)
+	if err != nil {
+		log.Fatal("Error sending issue confirm:", err)
 		return
 	}
 }

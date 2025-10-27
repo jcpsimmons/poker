@@ -37,7 +37,8 @@ func messageListener(app *tview.Application, conn *websocket.Conn, card *tview.T
 			panic(err)
 		}
 
-		if messageType == types.RevealData {
+		switch messageType {
+		case types.RevealData:
 			var messageStruct types.RevealMessage
 			if err := json.Unmarshal(message, &messageStruct); err != nil {
 				panic(err)
@@ -50,23 +51,71 @@ func messageListener(app *tview.Application, conn *websocket.Conn, card *tview.T
 				votes.AddItem(entry, 0, 1, true)
 			}
 			card.SetCellSimple(0, 1, messageStruct.Payload.PointAvg)
-		} else {
-			var messageStruct types.Message
-			if err := json.Unmarshal(message, &messageStruct); err != nil {
-				panic(err)
+
+		case types.MessageIssueSuggested:
+			var suggestedMsg types.IssueSuggestedMessage
+			if err := json.Unmarshal(message, &suggestedMsg); err != nil {
+				log.Println("Error parsing issue suggested:", err)
+				break
 			}
 
-			switch messageType {
-			case types.ParticipantCount:
-				card.SetCellSimple(1, 1, messageStruct.Payload)
-			case types.CurrentIssue:
-				card.SetTitle("Current Issue: " + messageStruct.Payload)
-				// Store description for modal (for now, description will be empty unless we send it separately)
-				currentIssueDescription = "No description available"
-			case types.ClearBoard:
-				card.SetTitle("Current Issue: None")
-				card.SetCellSimple(0, 1, "0")
+			// Store in pending issue state
+			payload := suggestedMsg.Payload
+			if payload.Source == "linear" {
+				SetPendingIssue(&PendingIssue{
+					Identifier:  payload.Identifier,
+					Title:       payload.Title,
+					Description: payload.Description,
+					URL:         payload.URL,
+					QueueIndex:  payload.QueueIndex,
+					FromLinear:  true,
+					HasMore:     payload.HasMore,
+				})
+				log.Printf("Received Linear issue suggestion: %s", payload.Identifier)
+			} else if payload.Source == "system" {
+				// No more issues
+				ClearPendingIssue()
+				log.Println(payload.Title)
 			}
+
+		case types.MessageIssueLoaded:
+			var loadedMsg types.IssueLoadedMessage
+			if err := json.Unmarshal(message, &loadedMsg); err != nil {
+				log.Println("Error parsing issue loaded:", err)
+				break
+			}
+
+			// Clear pending issue
+			ClearPendingIssue()
+			card.SetTitle("Current Issue: " + loadedMsg.Payload.Title)
+			log.Printf("Issue loaded: %s", loadedMsg.Payload.Identifier)
+
+		case types.MessageIssueStale:
+			var messageStruct types.Message
+			if err := json.Unmarshal(message, &messageStruct); err != nil {
+				log.Println("Error parsing stale message:", err)
+				break
+			}
+			log.Printf("Issue queue changed: %s", messageStruct.Payload)
+
+		case types.ParticipantCount:
+			var messageStruct types.Message
+			if err := json.Unmarshal(message, &messageStruct); err != nil {
+				break
+			}
+			card.SetCellSimple(1, 1, messageStruct.Payload)
+
+		case types.CurrentIssue:
+			var messageStruct types.Message
+			if err := json.Unmarshal(message, &messageStruct); err != nil {
+				break
+			}
+			card.SetTitle("Current Issue: " + messageStruct.Payload)
+			currentIssueDescription = "No description available"
+
+		case types.ClearBoard:
+			card.SetTitle("Current Issue: None")
+			card.SetCellSimple(0, 1, "0")
 		}
 
 		app.Draw()

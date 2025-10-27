@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -25,32 +26,136 @@ func generateHostForm(app *tview.Application, conn *websocket.Conn) *tview.TextV
 	return text
 }
 
-func generateModal(app *tview.Application, conn *websocket.Conn, pages *tview.Pages) *tview.Flex {
-	form := tview.NewForm()
-	form.AddInputField("Issue", "", 0, nil, nil)
-	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+// Global variables for modal components
+var modalDescriptionView *tview.TextView
+var modalTitleBox *tview.Box
+var isCustomMode bool = false
+
+func generateModal(app *tview.Application, conn *websocket.Conn, pages *tview.Pages) (*tview.Flex, *tview.InputField) {
+	// Description preview pane (scrollable)
+	modalDescriptionView = tview.NewTextView().
+		SetDynamicColors(true).
+		SetScrollable(true).
+		SetWrap(true)
+	modalDescriptionView.SetBorder(true).
+		SetTitle("Description Preview").
+		SetTitleAlign(tview.AlignLeft).
+		SetBorderPadding(0, 0, 1, 1)
+
+	// Input field for issue title
+	inputField := tview.NewInputField().
+		SetLabel("Issue: ").
+		SetFieldWidth(0)
+	inputField.SetBorder(false)
+
+	// Helper text
+	helperText := tview.NewTextView().
+		SetDynamicColors(true).
+		SetText("[gray]Press Enter to confirm, Esc to cancel, Tab to toggle custom mode")
+	helperText.SetBorder(false)
+
+	// Container for input and helper
+	inputContainer := tview.NewFlex().
+		SetDirection(tview.FlexRow).
+		AddItem(inputField, 1, 0, true).
+		AddItem(helperText, 1, 0, false)
+	inputContainer.SetBorder(true).
+		SetTitle("Update Issue").
+		SetTitleAlign(tview.AlignLeft).
+		SetBorderPadding(0, 0, 1, 1)
+
+	// Main form container
+	formFlex := tview.NewFlex().
+		SetDirection(tview.FlexRow).
+		AddItem(modalDescriptionView, 12, 0, false). // Fixed height for description
+		AddItem(inputContainer, 0, 1, true)
+
+	// Handle input
+	inputField.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEscape {
 			pages.HidePage("modal")
+			isCustomMode = false
 			return nil
 		}
-		if event.Key() == tcell.KeyEnter {
-			formText := form.GetFormItem(0).(*tview.InputField).GetText()
-			messaging.NewIssue(conn, formText)
-			pages.HidePage("modal")
+
+		if event.Key() == tcell.KeyTab {
+			// Toggle custom mode
+			isCustomMode = !isCustomMode
+			if isCustomMode {
+				inputField.SetText("")
+				inputContainer.SetTitle("Update Issue - Custom Mode")
+				modalDescriptionView.SetText("[yellow]Custom mode: Enter any issue text")
+			} else {
+				// Restore Linear issue if available
+				pending := GetPendingIssue()
+				if pending != nil && pending.FromLinear {
+					issueText := fmt.Sprintf("%s: %s", pending.Identifier, pending.Title)
+					inputField.SetText(issueText)
+					inputContainer.SetTitle(fmt.Sprintf("Update Issue - Linear: %s", pending.Identifier))
+				}
+			}
+			return nil
 		}
+
+		if event.Key() == tcell.KeyEnter {
+			formText := inputField.GetText()
+			if formText == "" {
+				return nil
+			}
+
+			pending := GetPendingIssue()
+
+			if isCustomMode || pending == nil || !pending.FromLinear {
+				// Custom issue
+				messaging.SendIssueConfirm(conn, formText, -1, true)
+			} else {
+				// Linear issue
+				messaging.SendIssueConfirm(conn, pending.Identifier, pending.QueueIndex, false)
+			}
+
+			pages.HidePage("modal")
+			isCustomMode = false
+			return nil
+		}
+
 		return event
 	})
 
-	form.SetBorder(true).SetTitle("New Issue").SetTitleAlign(tview.AlignLeft).SetBorderPadding(1, 1, 1, 1).SetBackgroundColor(tcell.ColorLimeGreen)
-
-	return tview.NewFlex().
+	modalFlex := tview.NewFlex().
 		AddItem(nil, 0, 1, false).
 		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
 			AddItem(nil, 0, 1, false).
-			AddItem(form, 0, 1, true).
-			AddItem(nil, 0, 1, false), 0, 1, true).
+			AddItem(formFlex, 20, 0, true).
+			AddItem(nil, 0, 1, false), 80, 0, true).
 		AddItem(nil, 0, 1, false)
 
+	return modalFlex, inputField
+}
+
+// UpdateModalDescription updates the modal description text
+func UpdateModalDescription(pages *tview.Pages, description, url string, hasMore bool) {
+	if modalDescriptionView == nil {
+		return
+	}
+
+	if description == "" {
+		modalDescriptionView.SetText("[gray]No description available")
+		return
+	}
+
+	text := description
+	if hasMore && url != "" {
+		text += fmt.Sprintf("\n\n[blue]Open in Linear for full description:[white] %s", url)
+	}
+
+	modalDescriptionView.SetText(text)
+	modalDescriptionView.ScrollToBeginning()
+}
+
+// UpdateModalTitle updates the modal title
+func UpdateModalTitle(pages *tview.Pages, title string) {
+	// Title is updated via the inputContainer in the modal generation
+	// This function is here for future extensibility
 }
 
 func generateEstimationForm(app *tview.Application, conn *websocket.Conn, isHost bool) *tview.Flex {

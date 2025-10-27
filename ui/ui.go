@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"fmt"
+
 	"github.com/jcpsimmons/poker/messaging"
 
 	"github.com/gdamore/tcell/v2"
@@ -11,7 +13,7 @@ import (
 func PokerClientMainView(isHost bool, username, serverAddr string) {
 	connection := connect(serverAddr)
 	defer connection.Close()
-	messaging.JoinSession(connection, username)
+	messaging.JoinSession(connection, username, isHost)
 
 	app := tview.NewApplication()
 
@@ -46,7 +48,7 @@ func PokerClientMainView(isHost bool, username, serverAddr string) {
 	outermostFlex.AddItem(statusBar, 1, 0, false)
 
 	pages := tview.NewPages().AddPage("main", outermostFlex, true, true)
-	modal := generateModal(app, connection, pages)
+	modal, modalInputField := generateModal(app, connection, pages)
 	pages.AddPage("modal", modal, true, false)
 
 	// Create description modal
@@ -68,11 +70,22 @@ func PokerClientMainView(isHost bool, username, serverAddr string) {
 			app.SetFocus(estimationForm)
 			switch event.Rune() {
 			case 'u':
-				messaging.ResetBoard(connection)
+				// Open modal with pending issue if available
+				pending := GetPendingIssue()
+				if pending != nil && pending.FromLinear {
+					// Pre-fill with Linear issue
+					issueText := fmt.Sprintf("%s: %s", pending.Identifier, pending.Title)
+					modalInputField.SetText(issueText)
+					UpdateModalDescription(pages, pending.Description, pending.URL, pending.HasMore)
+					UpdateModalTitle(pages, fmt.Sprintf("Update Issue - Linear: %s", pending.Identifier))
+				} else {
+					// Empty modal for custom entry
+					modalInputField.SetText("")
+					UpdateModalDescription(pages, "", "", false)
+					UpdateModalTitle(pages, "Update Issue")
+				}
 				pages.ShowPage("modal")
-				textInput := modal.GetItem(1).(*tview.Flex).GetItem(1).(*tview.Form).GetFormItem(0).(*tview.InputField)
-				textInput.SetText("")
-				app.SetFocus(textInput)
+				app.SetFocus(modalInputField)
 				return nil
 			case 'r':
 				messaging.RevealRound(connection)

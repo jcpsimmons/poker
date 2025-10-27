@@ -15,11 +15,26 @@ const (
 	RevealData       MessageType = "revealData"
 	CurrentEstimate  MessageType = "currentEstimate"
 	ClearBoard       MessageType = "clearBoard"
+	// Linear queue management
+	MessageIssueSuggested MessageType = "issueSuggested"
+	MessageIssueConfirm   MessageType = "issueConfirm"
+	MessageIssueLoaded    MessageType = "issueLoaded"
+	MessageIssueStale     MessageType = "issueStale"
 )
 
 type Message struct {
 	Type    MessageType `json:"type"`
 	Payload string      `json:"payload"`
+}
+
+type JoinPayload struct {
+	Username string `json:"username"`
+	IsHost   bool   `json:"isHost"`
+}
+
+type JoinMessage struct {
+	Type    MessageType `json:"type"`
+	Payload JoinPayload `json:"payload"`
 }
 
 type UserEstimate struct {
@@ -59,4 +74,49 @@ type IssueRevealData struct {
 	Estimates       []UserEstimate `json:"estimates"`
 	Average         int64          `json:"average"`
 	RoundedEstimate int64          `json:"roundedEstimate"`
+}
+
+// IssueSuggestedPayload contains details for a suggested issue with versioning
+type IssueSuggestedPayload struct {
+	Version     int    `json:"version"` // start at 1
+	Source      string `json:"source"`  // "linear" | "custom" | "system"
+	Identifier  string `json:"identifier"`
+	Title       string `json:"title"`
+	Description string `json:"description,omitempty"`
+	URL         string `json:"url,omitempty"`
+	QueueIndex  int    `json:"queueIndex"`
+	HasMore     bool   `json:"hasMore,omitempty"` // if description truncated
+}
+
+// IssueConfirmPayload sent by client to confirm loading an issue
+type IssueConfirmPayload struct {
+	RequestID  string `json:"requestId"`
+	Identifier string `json:"identifier"`
+	QueueIndex int    `json:"queueIndex"`
+	IsCustom   bool   `json:"isCustom"`
+}
+
+// IssueLoadedPayload broadcast when an issue is loaded
+type IssueLoadedPayload struct {
+	Identifier string `json:"identifier"`
+	Title      string `json:"title"`
+	QueueIndex int    `json:"queueIndex"`
+}
+
+// IssueSuggestedMessage wraps IssueSuggestedPayload
+type IssueSuggestedMessage struct {
+	Type    MessageType           `json:"type"`
+	Payload IssueSuggestedPayload `json:"payload"`
+}
+
+// IssueConfirmMessage wraps IssueConfirmPayload
+type IssueConfirmMessage struct {
+	Type    MessageType         `json:"type"`
+	Payload IssueConfirmPayload `json:"payload"`
+}
+
+// IssueLoadedMessage wraps IssueLoadedPayload
+type IssueLoadedMessage struct {
+	Type    MessageType        `json:"type"`
+	Payload IssueLoadedPayload `json:"payload"`
 }
