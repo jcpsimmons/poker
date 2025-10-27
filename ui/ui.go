@@ -49,6 +49,10 @@ func PokerClientMainView(isHost bool, username, serverAddr string) {
 	modal := generateModal(app, connection, pages)
 	pages.AddPage("modal", modal, true, false)
 
+	// Create description modal
+	descriptionModal := generateDescriptionModal(pages)
+	pages.AddPage("description", descriptionModal, true, false)
+
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		curTopPage, _ := pages.GetFrontPage()
 
@@ -73,6 +77,18 @@ func PokerClientMainView(isHost bool, username, serverAddr string) {
 			case 'r':
 				messaging.RevealRound(connection)
 			}
+		}
+
+		// Description modal hotkey (works for everyone)
+		if event.Rune() == 'd' && curTopPage == "main" {
+			pages.ShowPage("description")
+			return nil
+		}
+
+		// Close description modal
+		if curTopPage == "description" && (event.Key() == tcell.KeyEscape || event.Rune() == 'd') {
+			pages.HidePage("description")
+			return nil
 		}
 
 		return event

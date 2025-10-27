@@ -24,8 +24,11 @@ Free online planning poker tools pretty universally suck. `poker` aims to fix th
 - No external dependencies or infrastructure
 - Works on LAN, Tailscale, or with ngrok
 - One executable for both server and client
+- Linear integration for seamless issue tracking (NEW)
 
 Just install one executable - it can run in either client or server mode. With Tailscale, zero configuration is needed: your team just connects and starts estimating.
+
+Now with Linear integration! Pull issues directly from your Linear cycles, estimate them in the TUI, and results are automatically posted back to Linear as comments.
 
 ## Installation
 
@@ -64,6 +67,30 @@ For manual setup with ngrok or on a local network:
 4. Connect to your instance as a client in host mode: `poker client --host josh wss://ngrok-gibberish.ngrok-free.app` (be certain you're using `wss` if using `ngrok`)
 5. Share the URL with your team - to connect as a non-host client: `poker client alice wss://ngrok-gibberish.ngrok-free.app`
 
+### Linear Integration
+
+Integrate with Linear to pull issues from cycles and push estimates back automatically:
+
+1. Get a Linear personal API key from your account settings
+2. Create config file: `~/.config/poker/config.yaml`:
+   ```yaml
+   linear:
+     api_key: "lin_api_your_key_here"
+   ```
+3. Start server with Linear cycle: `poker server --linear-cycle https://linear.app/yourorg/team/TEAM/cycle/upcoming`
+4. Server will fetch all unestimated issues from the cycle
+5. When host presses 'u' to update issue, Dropdown opens and shows the title with a truncated description
+6. Press 'd' to view full issue description in a modal
+7. After voting and reveal, press 'u' again to move to next issue
+8. Voting results are automatically posted to Linear as a comment
+9. Repeat until all issues are estimated
+
+**Benefits:**
+- No copy-pasting issue descriptions
+- Estimates automatically recorded in Linear
+- Detailed voting breakdowns preserved in comments
+- Filter out already-estimated issues
+
 ### Notes
 
 - Use `ws://` protocol for local/LAN connections
@@ -76,6 +103,9 @@ For manual setup with ngrok or on a local network:
 ```bash
 # Start a server with auto-discovery
 poker server --announce --name "my-team"
+
+# Start a server with Linear integration
+poker server --linear-cycle https://linear.app/org/team/TEAM/cycle/upcoming
 
 # Discover available sessions
 poker discover

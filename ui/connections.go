@@ -61,6 +61,8 @@ func messageListener(app *tview.Application, conn *websocket.Conn, card *tview.T
 				card.SetCellSimple(1, 1, messageStruct.Payload)
 			case types.CurrentIssue:
 				card.SetTitle("Current Issue: " + messageStruct.Payload)
+				// Store description for modal (for now, description will be empty unless we send it separately)
+				currentIssueDescription = "No description available"
 			case types.ClearBoard:
 				card.SetTitle("Current Issue: None")
 				card.SetCellSimple(0, 1, "0")

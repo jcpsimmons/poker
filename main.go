@@ -10,8 +10,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jcpsimmons/poker/config"
 	"github.com/jcpsimmons/poker/discovery"
+	"github.com/jcpsimmons/poker/linear"
 	"github.com/jcpsimmons/poker/server"
+	"github.com/jcpsimmons/poker/types"
 	"github.com/jcpsimmons/poker/ui"
 
 	"github.com/urfave/cli/v2"
@@ -41,15 +44,67 @@ func main() {
 						Usage: "port to listen on",
 						Value: "8080",
 					},
+					&cli.StringFlag{
+						Name:  "linear-cycle",
+						Usage: "Linear cycle URL to pull issues from (e.g., https://linear.app/customerio/team/CDP/cycle/upcoming)",
+						Value: "",
+					},
 				},
 				Action: func(cCtx *cli.Context) error {
 					port := cCtx.String("port")
 					sessionName := cCtx.String("name")
+					linearCycleURL := cCtx.String("linear-cycle")
 
 					// Default session name to hostname if not provided
 					if sessionName == "" {
 						hostname, _ := os.Hostname()
 						sessionName = hostname
+					}
+
+					// Handle Linear integration if requested
+					if linearCycleURL != "" {
+						// Load config
+						cfg, err := config.Load()
+						if err != nil {
+							return fmt.Errorf("failed to load config: %w", err)
+						}
+
+						// Parse cycle URL
+						cycleInfo, err := linear.ParseCycleURL(linearCycleURL)
+						if err != nil {
+							return fmt.Errorf("failed to parse cycle URL: %w", err)
+						}
+
+						// Create Linear client
+						linearClient := linear.NewClient(cfg.Linear.APIKey)
+
+						// Fetch issues
+						log.Println("Fetching Linear issues...")
+						linearIssues, err := linearClient.FetchCycleIssuesWithoutEstimates(cycleInfo)
+						if err != nil {
+							return fmt.Errorf("failed to fetch Linear issues: %w", err)
+						}
+
+						if len(linearIssues) == 0 {
+							log.Println("No unestimated issues found in cycle")
+						} else {
+							log.Printf("Found %d unestimated issue(s) in cycle", len(linearIssues))
+
+							// Convert to server format
+							issues := make([]types.LinearIssue, 0, len(linearIssues))
+							for _, li := range linearIssues {
+								issues = append(issues, types.LinearIssue{
+									ID:          li.ID,
+									Identifier:  li.Identifier,
+									Title:       li.Title,
+									Description: li.Description,
+									URL:         li.URL,
+								})
+							}
+
+							// Pass to server
+							server.SetLinearIssues(issues, linearClient)
+						}
 					}
 
 					// Announce session if requested

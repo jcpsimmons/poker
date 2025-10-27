@@ -1,12 +1,15 @@
 package server
 
 import (
+	"fmt"
 	"log"
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 
+	"github.com/jcpsimmons/poker/linear"
 	"github.com/jcpsimmons/poker/messaging"
 	"github.com/jcpsimmons/poker/types"
 
@@ -24,6 +27,12 @@ var clients = make(map[*Client]bool)
 var currentIssue string = ""
 var hasHost = false
 
+// Linear integration state
+var linearClient *linear.LinearClient
+var linearIssues []types.LinearIssue
+var currentIssueIndex int = -1
+var currentLinearIssue *types.LinearIssue
+
 // mutex is used to synchronize access to the clients map.
 var mutex = &sync.Mutex{}
 
@@ -39,6 +48,14 @@ func Start(port string) {
 	http.HandleFunc("/", handler)
 	log.Println("Starting server on port ", strPort)
 	log.Fatal(http.ListenAndServe(strPort, nil))
+}
+
+// SetLinearIssues initializes Linear integration with issues and client
+func SetLinearIssues(issues []types.LinearIssue, client *linear.LinearClient) {
+	linearIssues = issues
+	linearClient = client
+	currentIssueIndex = 0
+	log.Printf("Linear integration enabled with %d issues", len(issues))
 }
 
 // handler handles incoming WebSocket connections.
@@ -97,7 +114,17 @@ func handleMessages(client *Client) {
 
 			broadcastParticipCount(client)
 		case types.NewIssue:
-			currentIssue = messageObject.Payload
+			// If we have Linear issues queued, use next from queue
+			if linearClient != nil && currentIssueIndex >= 0 && currentIssueIndex < len(linearIssues) {
+				issue := linearIssues[currentIssueIndex]
+				currentLinearIssue = &issue
+				currentIssue = fmt.Sprintf("%s: %s", issue.Identifier, issue.Title)
+				log.Printf("Loaded Linear issue: %s", currentIssue)
+			} else {
+				// Manual issue entry
+				currentIssue = messageObject.Payload
+				currentLinearIssue = nil
+			}
 			message := types.Message{
 				Type:    types.CurrentIssue,
 				Payload: currentIssue,
@@ -124,8 +151,23 @@ func handleMessages(client *Client) {
 			byteMessage := messaging.MarshallMessage(message)
 			broadcast(byteMessage, client)
 		case types.Reset:
+			// Push voting results to Linear if applicable
+			if currentLinearIssue != nil && linearClient != nil {
+				pushVotingResultsToLinear(client)
+			}
 			handleReset(client)
 			currentIssue = ""
+			currentLinearIssue = nil
+
+			// Move to next Linear issue if available
+			if linearClient != nil && len(linearIssues) > 0 {
+				currentIssueIndex++
+				if currentIssueIndex < len(linearIssues) {
+					log.Printf("Next Linear issue available: %s", linearIssues[currentIssueIndex].Identifier)
+				} else {
+					log.Println("All Linear issues have been estimated")
+				}
+			}
 
 		case types.Leave:
 			broadcastParticipCount(client)
@@ -245,4 +287,35 @@ func broadcast(message []byte, sender *Client) {
 		}
 	}
 	mutex.Unlock()
+}
+
+// pushVotingResultsToLinear posts voting results as a comment to the Linear issue
+func pushVotingResultsToLinear(sender *Client) {
+	if currentLinearIssue == nil || linearClient == nil {
+		return
+	}
+
+	// Get voting breakdown
+	estimates := getFormattedRevealData()
+	pointAvg := getPointAverage()
+
+	// Format comment
+	var comment strings.Builder
+	comment.WriteString("## Planning Poker Results\n\n")
+
+	for _, est := range estimates {
+		if est.Estimate != "0" {
+			comment.WriteString(fmt.Sprintf("- %s: %s\n", est.User, est.Estimate))
+		}
+	}
+
+	comment.WriteString(fmt.Sprintf("\n**Average:** %d points", pointAvg))
+
+	// Post to Linear
+	err := linearClient.PostComment(currentLinearIssue.ID, comment.String())
+	if err != nil {
+		log.Printf("Failed to post comment to Linear issue %s: %v", currentLinearIssue.Identifier, err)
+	} else {
+		log.Printf("Posted voting results to Linear issue %s", currentLinearIssue.Identifier)
+	}
 }

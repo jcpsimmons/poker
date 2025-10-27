@@ -121,6 +121,24 @@ func generateScoreCard() *tview.Table {
 	return table
 }
 
+// Global variable to store current issue description for the modal
+var currentIssueDescription string = ""
+
+func generateDescriptionModal(pages *tview.Pages) *tview.Flex {
+	textView := tview.NewTextView()
+	textView.SetDynamicColors(true)
+	textView.SetText("[yellow]Press ESC or 'd' to close\n\n" + currentIssueDescription)
+	textView.SetBorder(true).SetTitle("Issue Description").SetTitleAlign(tview.AlignLeft).SetBorderPadding(1, 1, 1, 1)
+
+	return tview.NewFlex().
+		AddItem(nil, 0, 1, false).
+		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+			AddItem(nil, 0, 1, false).
+			AddItem(textView, 0, 1, true).
+			AddItem(nil, 0, 1, false), 0, 1, true).
+		AddItem(nil, 0, 1, false)
+}
+
 func generateVoteText(score string, user string) *tview.TextView {
 	scoreVal := score
 	if scoreVal == "0" {
