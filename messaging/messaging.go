@@ -12,6 +12,20 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// Connect establishes a websocket connection to the server
+func Connect(serverAddr string) (*websocket.Conn, error) {
+	c, _, err := websocket.DefaultDialer.Dial(serverAddr, nil)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// ClearBoard sends a message to clear the board
+func ClearBoard(conn *websocket.Conn) {
+	sendMessage(types.Reset, "", conn)
+}
+
 func ResetBoard(conn *websocket.Conn) {
 	sendMessage(types.Reset, "", conn)
 }

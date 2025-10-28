@@ -49,8 +49,17 @@ var upgrader = websocket.Upgrader{
 
 func Start(port string) {
 	strPort := ":" + port
-	http.HandleFunc("/", handler)
-	log.Println("Starting server on port ", strPort)
+
+	// Serve static files from web/dist
+	fs := http.FileServer(http.Dir("./web/dist"))
+	http.Handle("/", fs)
+
+	// WebSocket endpoint
+	http.HandleFunc("/ws", handler)
+
+	log.Println("Starting server on port", strPort)
+	log.Println("Serving web app on http://localhost" + strPort)
+	log.Println("WebSocket endpoint: ws://localhost" + strPort + "/ws")
 	log.Fatal(http.ListenAndServe(strPort, nil))
 }
 

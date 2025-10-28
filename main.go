@@ -15,7 +15,6 @@ import (
 	"github.com/jcpsimmons/poker/linear"
 	"github.com/jcpsimmons/poker/server"
 	"github.com/jcpsimmons/poker/types"
-	"github.com/jcpsimmons/poker/ui"
 
 	"github.com/urfave/cli/v2"
 )
@@ -42,7 +41,7 @@ func main() {
 					&cli.StringFlag{
 						Name:  "port",
 						Usage: "port to listen on",
-						Value: "8080",
+						Value: "9867",
 					},
 					&cli.StringFlag{
 						Name:  "linear-cycle",
@@ -165,87 +164,6 @@ func main() {
 						fmt.Printf("%-30s %-20s %-10d\n", session.Name, address, session.Port)
 					}
 
-					return nil
-				},
-			},
-			{
-				Name:    "client",
-				Aliases: []string{"c"},
-				Usage:   "connect to a planning poker instance",
-				Flags: []cli.Flag{
-					&cli.BoolFlag{
-						Name:    "host",
-						Aliases: []string{"o"},
-						Usage:   "run in host mode",
-						Value:   false,
-					},
-					&cli.BoolFlag{
-						Name:  "auto",
-						Usage: "auto-connect to first discovered session",
-					},
-				},
-				Action: func(cCtx *cli.Context) error {
-					username := cCtx.Args().First()
-					serverAddr := cCtx.Args().Get(1)
-
-					if username == "" {
-						return fmt.Errorf("username is required")
-					}
-
-					// If no server address provided, try to discover
-					if serverAddr == "" {
-						ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-						defer cancel()
-
-						fmt.Println("Discovering poker sessions...")
-						sessions, err := discovery.DiscoverSessions(ctx, 5*time.Second)
-						if err != nil {
-							return fmt.Errorf("discovery failed: %w", err)
-						}
-
-						if len(sessions) == 0 {
-							return fmt.Errorf("no poker sessions found and no server address provided")
-						}
-
-						// Auto-connect if flag is set or only one session
-						if cCtx.Bool("auto") || len(sessions) == 1 {
-							session := sessions[0]
-							addr := session.Address()
-							if addr == "" {
-								addr = session.Host
-							}
-							serverAddr = fmt.Sprintf("ws://%s:%d", addr, session.Port)
-							fmt.Printf("Connecting to: %s (%s)\n", session.Name, serverAddr)
-						} else {
-							// List sessions and let user choose
-							fmt.Printf("\nFound %d session(s):\n\n", len(sessions))
-							for i, session := range sessions {
-								addr := session.Address()
-								if addr == "" {
-									addr = session.Host
-								}
-								fmt.Printf("%d. %s (%s:%d)\n", i+1, session.Name, addr, session.Port)
-							}
-
-							fmt.Print("\nSelect session (1-" + strconv.Itoa(len(sessions)) + "): ")
-							var choice int
-							_, err = fmt.Scanf("%d", &choice)
-							if err != nil || choice < 1 || choice > len(sessions) {
-								return fmt.Errorf("invalid selection")
-							}
-
-							session := sessions[choice-1]
-							addr := session.Address()
-							if addr == "" {
-								addr = session.Host
-							}
-							serverAddr = fmt.Sprintf("ws://%s:%d", addr, session.Port)
-							fmt.Printf("Connecting to: %s\n", session.Name)
-						}
-					}
-
-					isHost := cCtx.Bool("host")
-					ui.PokerClientMainView(isHost, username, serverAddr)
 					return nil
 				},
 			},
