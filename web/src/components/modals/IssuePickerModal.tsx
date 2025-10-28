@@ -31,27 +31,27 @@ export const IssuePickerModal = ({ isOpen, onClose }: IssuePickerModalProps) => 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-[#1E293B] border-2 border-primary rounded-xl p-6 max-w-2xl w-full mx-4">
+      <div className="bg-card border border-border/50 rounded p-6 max-w-2xl w-full mx-4">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-primary flex items-center gap-2">
-            📝 Update Issue
+          <h2 className="text-lg font-medium text-foreground font-mono uppercase tracking-wider">
+            UPDATE ISSUE
           </h2>
           <button
             onClick={onClose}
-            className="text-muted hover:text-white transition-colors"
+            className="text-muted-foreground hover:text-foreground transition-colors"
           >
-            <X className="w-6 h-6" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         <div className="space-y-4">
           {gameState.pendingIssue && gameState.pendingIssue.source === "linear" && !isCustomMode ? (
-            <div className="bg-info/10 border border-info rounded-lg p-4">
-              <div className="text-info font-bold text-lg mb-2">
+            <div className="bg-muted border border-border/50 rounded p-4">
+              <div className="text-foreground font-medium text-sm mb-2 font-mono">
                 {gameState.pendingIssue.identifier}: {gameState.pendingIssue.title}
               </div>
               {gameState.pendingIssue.description && (
-                <div className="text-white text-sm mb-2 max-h-40 overflow-y-auto">
+                <div className="text-muted-foreground text-xs mb-2 max-h-40 overflow-y-auto font-mono">
                   {gameState.pendingIssue.description}
                 </div>
               )}
@@ -60,16 +60,16 @@ export const IssuePickerModal = ({ isOpen, onClose }: IssuePickerModalProps) => 
                   href={gameState.pendingIssue.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-info hover:text-info/80 text-sm"
+                  className="text-foreground hover:text-foreground/80 text-xs font-mono underline"
                 >
-                  🔗 View in Linear
+                  View in Linear
                 </a>
               )}
             </div>
           ) : null}
 
           <div>
-            <label className="text-secondary font-semibold block mb-2">
+            <label className="text-foreground font-medium block mb-2 text-xs font-mono uppercase">
               {isCustomMode ? "Custom Issue:" : "Or enter custom issue:"}
             </label>
             <input
@@ -77,7 +77,7 @@ export const IssuePickerModal = ({ isOpen, onClose }: IssuePickerModalProps) => 
               value={customIssue}
               onChange={(e) => setCustomIssue(e.target.value)}
               placeholder="Enter issue title..."
-              className="w-full bg-[#374151] text-white border border-secondary rounded-lg px-4 py-3 focus:outline-none focus:border-primary transition-colors"
+              className="w-full bg-background text-foreground border border-border/50 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20 transition-all font-mono"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   handleSubmit();
@@ -86,10 +86,10 @@ export const IssuePickerModal = ({ isOpen, onClose }: IssuePickerModalProps) => 
             />
           </div>
 
-          <div className="flex items-center gap-2 text-sm text-muted">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <button
               onClick={() => setIsCustomMode(!isCustomMode)}
-              className="text-accent hover:text-accent/80 font-medium"
+              className="text-foreground hover:text-foreground/80 font-mono text-xs"
             >
               {isCustomMode ? "← Back to Linear issue" : "→ Use custom issue instead"}
             </button>
@@ -99,9 +99,9 @@ export const IssuePickerModal = ({ isOpen, onClose }: IssuePickerModalProps) => 
         <div className="mt-6 flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 bg-muted/20 hover:bg-muted/30 text-white font-bold py-3 px-4 rounded-lg transition-all"
+            className="flex-1 border border-border/50 bg-transparent hover:bg-muted text-foreground font-mono text-xs py-2 px-4 rounded transition-all"
           >
-            Cancel
+            CANCEL
           </button>
           <button
             onClick={handleSubmit}
@@ -109,9 +109,9 @@ export const IssuePickerModal = ({ isOpen, onClose }: IssuePickerModalProps) => 
               (isCustomMode && !customIssue.trim()) ||
               (!isCustomMode && !gameState.pendingIssue)
             }
-            className="flex-1 bg-success hover:bg-success/90 text-black font-bold py-3 px-4 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 bg-foreground hover:bg-foreground/90 text-background font-mono text-xs py-2 px-4 rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Load Issue
+            LOAD ISSUE
           </button>
         </div>
       </div>

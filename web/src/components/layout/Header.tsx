@@ -1,8 +1,17 @@
 import { usePoker } from "../../contexts/PokerContext";
-import { Shield, Activity } from "lucide-react";
+import { Shield, Activity, LogOut } from "lucide-react";
 
-export const Header = () => {
-  const { gameState } = usePoker();
+interface HeaderProps {
+  onLeave: () => void;
+}
+
+export const Header = ({ onLeave }: HeaderProps) => {
+  const { gameState, leave } = usePoker();
+
+  const handleLeave = () => {
+    leave();
+    onLeave();
+  };
 
   return (
     <div className="border-b border-border/50 bg-background">
@@ -43,6 +52,15 @@ export const Header = () => {
               {window.location.host.split(':')[0]}
             </span>
           </div>
+          <div className="h-3 w-px bg-border" />
+          <button
+            onClick={handleLeave}
+            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors hover:bg-muted border border-border/50"
+            aria-label="Leave session"
+          >
+            <LogOut className="w-3 h-3 text-foreground" />
+            <span className="font-mono text-foreground">LEAVE</span>
+          </button>
         </div>
       </div>
     </div>

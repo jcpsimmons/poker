@@ -8,9 +8,15 @@ interface JoinPageProps {
 
 export const JoinPage = ({ onJoin }: JoinPageProps) => {
   const { connect } = usePoker();
-  const [username, setUsername] = useState("");
-  const [serverUrl, setServerUrl] = useState("ws://localhost:9867/ws");
-  const [isHost, setIsHost] = useState(false);
+  const [username, setUsername] = useState(() => {
+    return localStorage.getItem('poker_username') || '';
+  });
+  const [serverUrl, setServerUrl] = useState(() => {
+    return localStorage.getItem('poker_server_url') || 'ws://localhost:9867/ws';
+  });
+  const [isHost, setIsHost] = useState(() => {
+    return localStorage.getItem('poker_is_host') === 'true';
+  });
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState("");
 
@@ -28,11 +34,19 @@ export const JoinPage = ({ onJoin }: JoinPageProps) => {
     try {
       setConnecting(true);
       setError("");
+      
+      // Save to localStorage for persistence
+      localStorage.setItem('poker_username', username);
+      localStorage.setItem('poker_server_url', serverUrl);
+      localStorage.setItem('poker_is_host', isHost.toString());
+      
       await connect(serverUrl, username, isHost);
       onJoin();
     } catch (err) {
       setError("Failed to connect. Please check the server URL and try again.");
       console.error("Connection error:", err);
+      // Clear the active session flag if auto-join fails
+      localStorage.removeItem('poker_active_session');
     } finally {
       setConnecting(false);
     }

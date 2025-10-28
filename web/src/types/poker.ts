@@ -13,6 +13,7 @@ export const MessageType = {
   RevealData: "revealData",
   CurrentEstimate: "currentEstimate",
   ClearBoard: "clearBoard",
+  VoteStatus: "voteStatus",
   // Linear queue management
   IssueSuggested: "issueSuggested",
   IssueConfirm: "issueConfirm",
@@ -89,6 +90,15 @@ export interface IssueLoadedPayload {
   queueIndex: number;
 }
 
+export interface VoterInfo {
+  username: string;
+  hasVoted: boolean;
+}
+
+export interface VoteStatusPayload {
+  voters: VoterInfo[];
+}
+
 // Client-side state
 export interface GameState {
   connected: boolean;
@@ -120,11 +130,11 @@ export interface EstimateOption {
 }
 
 export const ESTIMATE_OPTIONS: EstimateOption[] = [
-  { points: 1, label: "1 point", description: "Tiny task", icon: "📝" },
-  { points: 2, label: "2 points", description: "Part of a day", icon: "🌅" },
-  { points: 3, label: "3 points", description: "Full day", icon: "☀️" },
-  { points: 5, label: "5 points", description: "2-3 days", icon: "📅" },
-  { points: 8, label: "8 points", description: "A week", icon: "📆" },
-  { points: 13, label: "13 points", description: "Break it down!", icon: "💥" },
+  { points: 1, label: "1 point", description: "Tiny task", icon: "1" },
+  { points: 2, label: "2 points", description: "Part of a day", icon: "2" },
+  { points: 3, label: "3 points", description: "Full day", icon: "3" },
+  { points: 5, label: "5 points", description: "2-3 days", icon: "5" },
+  { points: 8, label: "8 points", description: "A week", icon: "8" },
+  { points: 13, label: "13 points", description: "Break it down!", icon: "13" },
 ];
 

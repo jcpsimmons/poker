@@ -1,0 +1,49 @@
+2025/10/28 16:25:23 Starting server on port :9867
+2025/10/28 16:25:23 Serving web app on http://localhost:9867
+2025/10/28 16:25:23 WebSocket endpoint: ws://localhost:9867/ws
+2025/10/28 16:25:25 raw message received:  {"type":"join","payload":{"username":"josh","isHost":true}}
+2025/10/28 16:25:25 User joined:  josh
+2025/10/28 16:25:25 Estimate average request
+2025/10/28 16:25:25 Participants:  1
+2025/10/28 16:25:25 Broadcasting message:  {"type":"participantCount","payload":"1"}
+2025/10/28 16:25:25 broadcast to client:  josh
+2025/10/28 16:25:25 Vote status for josh: estimate=0, hasVoted=false
+2025/10/28 16:25:25 Broadcasting message:  {"type":"voteStatus","payload":{"voters":[{"username":"josh","hasVoted":false}]}}
+2025/10/28 16:25:25 broadcast to client:  josh
+2025/10/28 16:25:25 Broadcasted vote status: 1 voters, 0 have voted
+2025/10/28 16:25:26 raw message received:  {"type":"join","payload":{"username":"another-person","isHost":false}}
+2025/10/28 16:25:26 User joined:  another-person
+2025/10/28 16:25:26 Estimate average request
+2025/10/28 16:25:26 Participants:  2
+2025/10/28 16:25:26 Broadcasting message:  {"type":"participantCount","payload":"2"}
+2025/10/28 16:25:26 broadcast to client:  josh
+2025/10/28 16:25:26 broadcast to client:  another-person
+2025/10/28 16:25:26 Vote status for josh: estimate=0, hasVoted=false
+2025/10/28 16:25:26 Vote status for another-person: estimate=0, hasVoted=false
+2025/10/28 16:25:26 Broadcasting message:  {"type":"voteStatus","payload":{"voters":[{"username":"josh","hasVoted":false},{"username":"another-person","hasVoted":false}]}}
+2025/10/28 16:25:26 broadcast to client:  josh
+2025/10/28 16:25:26 broadcast to client:  another-person
+2025/10/28 16:25:26 Broadcasted vote status: 2 voters, 0 have voted
+2025/10/28 16:25:27 raw message received:  {"type":"estimate","payload":"8"}
+2025/10/28 16:25:27 Vote status for josh: estimate=0, hasVoted=false
+2025/10/28 16:25:27 Vote status for another-person: estimate=8, hasVoted=true
+2025/10/28 16:25:27 Broadcasting message:  {"type":"voteStatus","payload":{"voters":[{"username":"josh","hasVoted":false},{"username":"another-person","hasVoted":true}]}}
+2025/10/28 16:25:27 broadcast to client:  josh
+2025/10/28 16:25:27 broadcast to client:  another-person
+2025/10/28 16:25:27 Broadcasted vote status: 2 voters, 1 have voted
+2025/10/28 16:25:29 raw message received:  {"type":"estimate","payload":"2"}
+2025/10/28 16:25:29 Vote status for josh: estimate=2, hasVoted=true
+2025/10/28 16:25:29 Vote status for another-person: estimate=8, hasVoted=true
+2025/10/28 16:25:29 Broadcasting message:  {"type":"voteStatus","payload":{"voters":[{"username":"josh","hasVoted":true},{"username":"another-person","hasVoted":true}]}}
+2025/10/28 16:25:29 broadcast to client:  josh
+2025/10/28 16:25:29 broadcast to client:  another-person
+2025/10/28 16:25:29 Broadcasted vote status: 2 voters, 2 have voted
+2025/10/28 16:25:46 raw message received:  {"type":"reveal","payload":""}
+2025/10/28 16:25:46 Estimate average request
+2025/10/28 16:25:46 Broadcasting message:  {"type":"revealData","payload":{"estimates":[{"user":"another-person","estimate":"8"},{"user":"josh","estimate":"2"}],"pointAvg":"5"}}
+2025/10/28 16:25:46 broadcast to client:  another-person
+2025/10/28 16:25:46 broadcast to client:  josh
+2025/10/28 16:25:56 Participants:  1
+2025/10/28 16:25:56 Broadcasting message:  {"type":"participantCount","payload":"1"}
+2025/10/28 16:25:56 broadcast to client:  josh
+2025/10/28 16:25:56 Error reading message: websocket: close 1001 (going away)

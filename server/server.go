@@ -142,6 +142,7 @@ func handleMessages(client *Client) {
 			sendClientMessage(client, estimateMessage)
 
 			broadcastParticipCount(client)
+			broadcastVoteStatus(client)
 		case types.NewIssue:
 			// If we have Linear issues queued, use next from queue
 			if linearClient != nil && currentIssueIndex >= 0 && currentIssueIndex < len(linearIssues) {
@@ -167,6 +168,7 @@ func handleMessages(client *Client) {
 				break
 			}
 			client.CurrentEstimate = numEstimate
+			broadcastVoteStatus(client)
 		case types.Reveal:
 			pointAvg := getPointAverage()
 			pointAvgStr := strconv.FormatInt(pointAvg, 10)
@@ -302,6 +304,8 @@ func handleReset(client *Client) {
 	byteMessage := messaging.MarshallMessage(clearMessage)
 	broadcast(byteMessage, client)
 
+	broadcastVoteStatus(client)
+
 	log.Println("Estimates reset.")
 }
 
@@ -314,6 +318,42 @@ func broadcastParticipCount(client *Client) {
 	}
 	byteMessage := messaging.MarshallMessage(pcMessage)
 	broadcast(byteMessage, client)
+}
+
+func broadcastVoteStatus(client *Client) {
+	voters := make([]types.VoterInfo, 0)
+
+	for c := range clients {
+		if c.UserID != "" {
+			hasVoted := c.CurrentEstimate > 0
+			log.Printf("Vote status for %s: estimate=%d, hasVoted=%v", c.UserID, c.CurrentEstimate, hasVoted)
+			voters = append(voters, types.VoterInfo{
+				Username: c.UserID,
+				HasVoted: hasVoted,
+			})
+		}
+	}
+
+	voteStatusMsg := types.VoteStatusMessage{
+		Type: types.VoteStatus,
+		Payload: types.VoteStatusPayload{
+			Voters: voters,
+		},
+	}
+
+	byteMessage := messaging.MarshallMessage(voteStatusMsg)
+	broadcast(byteMessage, client)
+	log.Printf("Broadcasted vote status: %d voters, %d have voted", len(voters), countVoted(voters))
+}
+
+func countVoted(voters []types.VoterInfo) int {
+	count := 0
+	for _, v := range voters {
+		if v.HasVoted {
+			count++
+		}
+	}
+	return count
 }
 
 func sendClientMessage(client *Client, message types.Message) {

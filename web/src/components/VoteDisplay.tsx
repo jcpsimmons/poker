@@ -1,5 +1,6 @@
 import { usePoker } from "../contexts/PokerContext";
 import { cn } from "../lib/utils";
+import { Panel } from "./layout/Panel";
 
 export const VoteDisplay = () => {
   const { gameState } = usePoker();
@@ -19,24 +20,25 @@ export const VoteDisplay = () => {
 
   if (gameState.votes.length === 0) {
     return (
-      <div className="border border-border/50 rounded p-3 bg-card">
-        <h3 className="text-foreground text-xs font-medium uppercase tracking-wider mb-2">
-          Votes
-        </h3>
-        <div className="text-muted-foreground text-xs font-mono text-center py-4">
+      <Panel 
+        title="VOTES" 
+        className="w-80 min-h-[400px] flex flex-col"
+        contentClassName="flex flex-col flex-1"
+      >
+        <div className="text-muted-foreground text-xs font-mono text-center flex-1 flex items-center justify-center">
           Waiting for votes...
         </div>
-      </div>
+      </Panel>
     );
   }
 
   return (
-    <div className="border border-border/50 rounded p-3 bg-card">
-      <h3 className="text-foreground text-xs font-medium uppercase tracking-wider mb-2">
-        Votes
-      </h3>
-
-      <div className="space-y-1.5">
+    <Panel 
+      title="VOTES" 
+      className="w-80 flex flex-col"
+      contentClassName="flex flex-col flex-1"
+    >
+      <div className="space-y-1.5 flex-1 overflow-y-auto">
         {gameState.votes.map((vote, index) => (
           <div
             key={index}
@@ -61,7 +63,7 @@ export const VoteDisplay = () => {
               </>
             ) : (
               <div className="flex-1 flex items-center gap-1.5">
-                <span className="text-primary text-xs animate-pulse">◆</span>
+                <span className="text-primary text-xs">●</span>
                 <span className="text-muted-foreground text-xs font-mono">VOTED</span>
               </div>
             )}
@@ -76,6 +78,6 @@ export const VoteDisplay = () => {
           </div>
         </div>
       )}
-    </div>
+    </Panel>
   );
 };

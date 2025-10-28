@@ -15,6 +15,7 @@ const (
 	RevealData       MessageType = "revealData"
 	CurrentEstimate  MessageType = "currentEstimate"
 	ClearBoard       MessageType = "clearBoard"
+	VoteStatus       MessageType = "voteStatus"
 	// Linear queue management
 	MessageIssueSuggested MessageType = "issueSuggested"
 	MessageIssueConfirm   MessageType = "issueConfirm"
@@ -50,6 +51,20 @@ type RevealPayload struct {
 type RevealMessage struct {
 	Type    MessageType   `json:"type"`
 	Payload RevealPayload `json:"payload"`
+}
+
+type VoterInfo struct {
+	Username string `json:"username"`
+	HasVoted bool   `json:"hasVoted"`
+}
+
+type VoteStatusPayload struct {
+	Voters []VoterInfo `json:"voters"`
+}
+
+type VoteStatusMessage struct {
+	Type    MessageType       `json:"type"`
+	Payload VoteStatusPayload `json:"payload"`
 }
 
 // LinearIssue represents a Linear issue with all relevant metadata
