@@ -64,7 +64,7 @@ export const StatusBar = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowHelp(true)}
-              className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             >
               <HelpCircle className="w-3 h-3" />
               <span>HELP</span>

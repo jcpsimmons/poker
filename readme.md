@@ -207,7 +207,27 @@ backend-team     100.64.1.12       9867
 
 ## Development
 
-### Running in Dev Mode
+### UI Development Mode (Recommended)
+
+One command starts both servers with hot module reloading:
+
+```bash
+./dev-ui.sh
+```
+
+This automatically:
+- Builds and starts Go WebSocket server on port 9867
+- Starts Vite dev server with HMR on port 5173/5174
+- Auto-detects WebSocket URL
+- Hot reloads on file changes
+
+Press `Ctrl+C` to stop both servers.
+
+**Access:** http://localhost:5173 (or 5174 if 5173 is in use)
+
+### Manual Dev Mode
+
+If you prefer separate terminals:
 
 ```bash
 # Terminal 1: Start Go server

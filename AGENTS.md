@@ -22,6 +22,7 @@
 - 🎨 **Modern UI**: React + Tailwind CSS with animations
 - 🌐 **Zero Config Networking**: Works on LAN, Tailscale, or via ngrok
 - 📦 **Linear Integration**: Pull issues, post results automatically
+- ✅ **Username Validation**: Client and server-side validation for usernames (2-20 chars, alphanumeric + spaces/hyphens/underscores)
 
 ---
 
@@ -115,7 +116,8 @@ poker/
 ├── discovery/
 │   ├── announce.go        # mDNS session announcement
 │   ├── browse.go          # Session discovery
-│   └── ip.go              # Tailscale IP detection
+│   ├── ip.go              # Tailscale IP detection
+│   └── session.go         # Session data structure
 ├── config/
 │   └── config.go          # Config file parsing
 ├── web/
@@ -132,19 +134,19 @@ poker/
 │   │   │   └── GamePage.tsx           # Main game interface
 │   │   ├── components/
 │   │   │   ├── layout/
-│   │   │   │   ├── Header.tsx         # Top bar
-│   │   │   │   ├── StatusBar.tsx      # Participants count
-│   │   │   │   └── Panel.tsx          # Container component
+│   │   │   │   ├── Header.tsx         # Top bar with leave button
+│   │   │   │   ├── StatusBar.tsx      # Bottom bar (participants, avg, round, help)
+│   │   │   │   └── Panel.tsx          # Reusable container component
 │   │   │   ├── modals/
-│   │   │   │   ├── HelpModal.tsx      # Help/instructions
-│   │   │   │   ├── IssuePickerModal.tsx  # Linear issue picker
-│   │   │   │   └── StatsModal.tsx     # Session statistics
-│   │   │   ├── EstimateSelector.tsx   # Vote buttons (1-13)
-│   │   │   ├── HostControls.tsx       # Reveal, Clear, Next Issue
-│   │   │   ├── IssueCard.tsx          # Current issue display
-│   │   │   ├── VoteDisplay.tsx        # Vote results (bar chart)
-│   │   │   ├── VoteStatus.tsx         # Who has voted indicator
-│   │   │   └── Confetti.tsx           # Celebration animation
+│   │   │   │   ├── HelpModal.tsx      # Help/instructions (opened from StatusBar)
+│   │   │   │   ├── IssuePickerModal.tsx  # Linear issue picker (opened from HostControls)
+│   │   │   │   └── StatsModal.tsx     # Session statistics (opened from HostControls)
+│   │   │   ├── EstimateSelector.tsx   # Vote buttons + voted indicator
+│   │   │   ├── HostControls.tsx       # Host controls (Next Issue, Reveal/Clear, Stats)
+│   │   │   ├── IssueCard.tsx          # Current issue display (not currently used in UI)
+│   │   │   ├── VoteDisplay.tsx        # Votes list + bar chart + average
+│   │   │   ├── VoteStatus.tsx         # X/Y voted indicator with color coding
+│   │   │   └── Confetti.tsx           # Celebration animation (consensus detection)
 │   │   └── types/
 │   │       └── poker.ts               # TypeScript types
 │   ├── dist/                          # Built static files (served by Go)
@@ -191,6 +193,7 @@ All messages follow this JSON structure:
 | `revealData` | `{ pointAvg, estimates[] }` | All votes revealed |
 | `clearBoard` | `""` | Board cleared, reset votes |
 | `voteStatus` | `{ voters: [{ username, hasVoted }] }` | Who has voted (updates in real-time) |
+| `joinError` | `"error message"` (string) | Username validation failed, connection will be closed |
 | `issueSuggested` | `{ version, source, identifier, title, ... }` | Linear issue available |
 | `issueLoaded` | `{ identifier, title, queueIndex }` | Issue successfully loaded |
 | `issueStale` | `"..."` | Queue changed, refresh needed |
@@ -204,6 +207,15 @@ Client → Server: { type: "join", payload: { username: "Alice", isHost: false }
 Server → Client: { type: "currentIssue", payload: "Waiting for host..." }
 Server → Client: { type: "participantCount", payload: "3" }
 Server → All:    { type: "participantCount", payload: "4" }
+```
+
+#### Username Validation Error
+
+```
+Client → Server: { type: "join", payload: { username: "A", isHost: false } }
+Server → Client: { type: "joinError", payload: "username must be at least 2 characters" }
+[Server closes connection]
+[Client shows error to user, allows retry]
 ```
 
 #### Voting Flow
@@ -345,25 +357,39 @@ interface PokerContextType {
 
 ```typescript
 class PokerWebSocket {
-  // Automatic reconnection with exponential backoff
+  // Connection state
+  private ws: WebSocket | null;
+  private url: string;
+  private shouldReconnect: boolean;
+  private isReconnecting: boolean;
+  
+  // Automatic reconnection
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
-  private reconnectDelay = 2000;
+  private reconnectDelay = 2000; // ms
+  private pendingReconnect: number | null;
   
   // Message handlers (observer pattern)
   private messageHandlers: Set<MessageHandler>;
   private reconnectHandlers: Set<ReconnectHandler>;
   
-  // Methods
-  connect(): Promise<void>
-  disconnect(): void
-  onMessage(handler: MessageHandler)
-  onReconnect(handler: ReconnectHandler)
+  // Public methods
+  connect(): Promise<void>          // Connect to WebSocket server
+  disconnect(): void                // Disconnect (sets shouldReconnect = false)
+  onMessage(handler): () => void    // Add message handler, returns cleanup function
+  onReconnect(handler): () => void  // Add reconnect handler, returns cleanup function
+  isConnected(): boolean            // Check if WebSocket is open
+  
+  // Game actions
   joinSession(username: string, isHost: boolean)
   sendEstimate(points: number)
   revealRound()
   resetBoard()
-  sendIssueConfirm(...)
+  sendIssueConfirm(identifier, queueIndex, isCustom)
+  
+  // Private helpers
+  private send(message: any)
+  private generateRequestId(): string
 }
 ```
 
@@ -380,40 +406,50 @@ class PokerWebSocket {
 
 ```tsx
 <GamePage>
-  <Header />
-  <Panel>
-    <StatusBar participants={} />
-    <IssueCard currentIssue={} />
-    
-    {!revealed && (
-      <>
-        <EstimateSelector onVote={} myVote={} />
-        <VoteStatus votes={} />
-      </>
-    )}
-    
-    {revealed && (
-      <VoteDisplay votes={} averagePoints={} />
-    )}
-    
-    {isHost && (
-      <HostControls 
-        onReveal={} 
-        onClear={} 
-        onNextIssue={} 
-      />
-    )}
-  </Panel>
+  <Header onLeave={} />
   
-  {/* Modals */}
-  <HelpModal />
-  <StatsModal />
-  <IssuePickerModal />
+  <main className="flex-1">
+    {/* Top Row: Voting and Vote Display */}
+    <div className="flex gap-3">
+      <EstimateSelector />  {/* Vote buttons 1-13, uses Panel internally */}
+      <VoteDisplay />       {/* Shows votes and results, uses Panel internally */}
+    </div>
+    
+    {/* Bottom Row: Status and Host Controls */}
+    <div className="flex gap-3">
+      <VoteStatus />        {/* Shows voted/total count, uses Panel internally */}
+      <HostControls />      {/* Host-only controls, uses Panel internally */}
+    </div>
+  </main>
+
+  <StatusBar />  {/* Bottom status bar with participant count */}
+  <Confetti />   {/* Celebration on consensus */}
   
-  {/* Celebration */}
-  <Confetti active={consensus} />
+  {/* Modals (opened from HostControls) */}
+  <IssuePickerModal />  {/* Opened by "NEXT ISSUE" button */}
+  <StatsModal />        {/* Opened by "STATS" button */}
 </GamePage>
 ```
+
+**Component Responsibilities:**
+
+- **EstimateSelector**: Vote buttons (1-13) + displays "VOTED: X" when vote submitted (uses Panel)
+- **VoteDisplay**: Shows list of votes (hidden until reveal) + bar chart + average points (uses Panel)
+- **VoteStatus**: Shows `X/Y VOTED` with color coding (red < 50%, yellow ≥ 50%, green = 100%) (uses Panel)
+- **HostControls**: Three buttons - NEXT ISSUE, REVEAL/CLEAR (toggles), STATS (host only, uses Panel)
+- **Header**: Top bar showing:
+  - App title ("POKER")
+  - Username with "HOST" badge (if host)
+  - Connection status indicator (green "LINK" or red "DOWN" with animated pulse)
+  - Server hostname
+  - Leave button
+- **StatusBar**: Bottom status bar showing:
+  - Participant count (hover to see list)
+  - Current average points
+  - Round number
+  - Help button (opens HelpModal)
+  - Version number
+- **Confetti**: Triggered when consensus is reached (votes within 2 points)
 
 ---
 
@@ -493,7 +529,28 @@ mutation($issueId: String!, $body: String!) {
 
 ## Development Workflow
 
-### Starting Development
+### Starting Development (Recommended)
+
+**One-command dev mode** with automatic hot module reloading:
+
+```bash
+./dev-ui.sh
+```
+
+This script automatically:
+- Builds the Go binary
+- Starts WebSocket server on port 9867
+- Starts Vite dev server with HMR on port 5173/5174
+- Auto-detects WebSocket URL based on origin
+- Handles cleanup on Ctrl+C
+
+**Access:** http://localhost:5173 (or 5174 if port is in use)
+
+Changes in `web/src/` instantly reload in the browser!
+
+### Manual Development (Two Terminals)
+
+If you prefer separate terminal control:
 
 ```bash
 # Terminal 1: Start Go server (watches for changes in web/dist)
@@ -612,9 +669,15 @@ Server suggests next Linear issue to hosts
 
 ### 1. **Single-Page Application Flow**
 
-- **JoinPage**: User enters username, selects host mode → saves to localStorage → calls `connect()`
-- **GamePage**: Main interface, conditionally renders based on `gameState.revealed` and `gameState.isHost`
-- No routing library (just conditional rendering based on `joined` state in App.tsx)
+- **App.tsx**: Root component with conditional rendering
+  - Checks `localStorage.poker_active_session` on mount to determine initial state
+  - Listens for `storage` events to sync across browser tabs
+  - Renders `JoinPage` or `GamePage` based on `joined` state
+- **JoinPage**: User enters username, selects host mode → saves to localStorage → calls `connect()` → sets `joined = true`
+- **GamePage**: Main interface with voting UI
+  - Conditionally renders based on `gameState.revealed` and `gameState.isHost`
+  - Shows different controls for host vs player
+- **No routing library**: Just conditional rendering based on `joined` state
 
 ### 2. **Host vs. Player Distinction**
 
@@ -627,23 +690,54 @@ Server suggests next Linear issue to hosts
 
 ### 3. **Vote Status System**
 
-- **Old behavior**: Server broadcast each individual vote
-- **Current behavior**: Server broadcasts aggregated `voteStatus` with all voters and hasVoted flags
-- **Client display**: Shows card icon for users who voted (but not their vote until reveal)
-- **Logic**: `client.CurrentEstimate > 0` means has voted
+- **Server behavior**: Broadcasts aggregated `voteStatus` message after any vote change
+- **Message structure**: `{ voters: [{ username: string, hasVoted: bool }] }`
+- **Server logic**: `client.CurrentEstimate > 0` means hasVoted = true
+- **Client display**: 
+  - **VoteDisplay component**: Shows "VOTED" indicator (● VOTED) for users who voted (points hidden until reveal)
+  - **VoteStatus component**: Shows `X/Y VOTED` count with color coding
+- **After reveal**: VoteDisplay shows actual point values and bar chart
 
-### 4. **Consensus Detection**
+### 4. **Username Validation**
 
-- **Client-side logic** in GamePage.tsx
-- **Condition**: `revealed && allVotesMatch && participants >= 2`
-- **Effect**: Confetti animation triggers
+- **Validation rules**: Usernames must be 2-20 characters, alphanumeric + spaces/hyphens/underscores only
+- **Client-side validation** (JoinPage.tsx):
+  - Real-time validation on input change with inline error messages
+  - Shows red border + error icon when invalid
+  - Disables JOIN button until username is valid
+  - Validation function: `validateUsername(username: string): ValidationResult`
+- **Server-side validation** (server.go):
+  - `validateUsername(username string) (string, error)` - returns trimmed username or error
+  - Called in `handleJoin()` before accepting connection
+  - Sends `joinError` message and closes connection if invalid
+  - Prevents malicious/invalid usernames from bypassing client checks
+- **Error handling flow**:
+  1. Client validates on input → shows inline error
+  2. User clicks JOIN → client validates again → sends join message
+  3. Server validates → if invalid, sends `joinError` → closes connection
+  4. Client receives `joinError` → shows error in modal → allows retry
+- **Trimming**: Both client and server trim whitespace from usernames
+
+### 5. **Consensus Detection**
+
+- **Client-side logic** in Confetti.tsx component
+- **Condition**: `revealed && votes.length >= 2 && (max - min) <= 2`
+- **Effect**: Confetti animation triggers for 5 seconds
 - **Implementation**:
   ```typescript
-  const allVotesMatch = votes.every(v => v.points === votes[0].points);
-  const consensus = revealed && allVotesMatch && votes.length >= 2;
+  // Check for consensus (all votes within 2 points of each other)
+  const points = votes.map(v => parseInt(v.points)).filter(p => !isNaN(p) && p > 0);
+  if (points.length >= 2) {
+    const min = Math.min(...points);
+    const max = Math.max(...points);
+    if (max - min <= 2) {
+      // Trigger confetti for 5 seconds
+    }
+  }
   ```
+- **Note**: This is more lenient than exact matching - votes of 3, 5, 5 would trigger consensus (max 5 - min 3 = 2 ≤ 2)
 
-### 5. **Issue Queue Versioning**
+### 6. **Issue Queue Versioning**
 
 - **Problem**: Race condition if multiple hosts click "Next Issue"
 - **Solution**: 
@@ -652,7 +746,7 @@ Server suggests next Linear issue to hosts
   - `issueConfirm` must match `pendingQueueIndex`
   - Mismatched confirmation → send `issueStale` + re-suggest
 
-### 6. **Session Persistence**
+### 7. **Session Persistence**
 
 - **localStorage keys:**
   - `poker_active_session`: "true" if session active
@@ -662,7 +756,7 @@ Server suggests next Linear issue to hosts
 - **Auto-reconnect**: On app mount, if `poker_active_session` is true, attempt to reconnect
 - **Leave action**: Clear all localStorage keys
 
-### 7. **Vote Averaging Algorithm**
+### 8. **Vote Averaging Algorithm**
 
 ```go
 possibleEstimates := []int64{1, 2, 3, 5, 8, 13}
@@ -679,7 +773,7 @@ return possibleEstimate with minimum difference
 
 Example: Votes are [3, 5, 5] → raw avg = 4.33 → closest is 5
 
-### 8. **Message Payload Formats**
+### 9. **Message Payload Formats**
 
 - **Simple string**: `{ type: "currentIssue", payload: "Issue text" }`
 - **JSON object**: `{ type: "revealData", payload: { pointAvg: "5", estimates: [...] } }`
@@ -767,25 +861,35 @@ Example: Votes are [3, 5, 5] → raw avg = 4.33 → closest is 5
 
 ### Modifying the UI Theme
 
-**Primary colors are in:**
-- `web/src/index.css` (CSS custom properties)
-- `web/tailwind.config.js` (Tailwind color palette)
+**Theme system:**
+- Uses CSS custom properties defined in `web/src/index.css`
+- Colors defined in HSL format for easy light/dark mode switching
+- Tailwind CSS configured to use these custom properties
 
-**Current palette:**
-- Primary: `#FF6B9D` (hot pink)
-- Secondary: `#C084FC` (purple)
-- Accent: `#FFA500` (orange)
-- Success: `#4ADE80` (green)
-
-**Change colors:**
+**Current color variables (HSL format):**
 ```css
 /* web/src/index.css */
 :root {
-  --color-primary: #FF6B9D;
-  --color-secondary: #C084FC;
-  /* ... */
+  --background: 0 0% 100%;        /* White */
+  --foreground: 222.2 84% 4.9%;   /* Dark blue-gray */
+  --primary: 222.2 47.4% 11.2%;   /* Dark blue */
+  --muted: 210 40% 96.1%;         /* Light gray */
+  --border: 214.3 31.8% 91.4%;    /* Light border */
+  /* ... and more */
 }
 ```
+
+**Confetti colors (hardcoded in Confetti.tsx):**
+- `#FF6B9D` (hot pink)
+- `#C084FC` (purple) 
+- `#FFA500` (orange)
+- `#4ADE80` (green)
+- `#60A5FA` (blue)
+
+**To change colors:**
+1. Modify HSL values in `:root` and `.dark` sections of `web/src/index.css`
+2. Colors use `hsl(var(--variable-name))` format in components
+3. Update confetti colors array in `Confetti.tsx` if desired
 
 ### Adding Server-Side Features
 
@@ -833,7 +937,7 @@ Example: Votes are [3, 5, 5] → raw avg = 4.33 → closest is 5
 - [ ] Reveal votes
 - [ ] Vote averaging calculation
 - [ ] Clear board
-- [ ] Consensus detection (all vote same) → confetti
+- [ ] Consensus detection (votes within 2 points) → confetti
 - [ ] Linear issue loading (if integrated)
 - [ ] WebSocket reconnection (kill server, restart)
 - [ ] Multiple simultaneous sessions
@@ -867,11 +971,13 @@ console.log(gameState.votes);
 
 **Common Issues:**
 
-1. **WebSocket connection fails**: Check port, firewall, CORS
-2. **Votes not updating**: Check `broadcastVoteStatus()` is called after estimate
-3. **Confetti not showing**: Check `revealed && allVotesMatch` logic
-4. **Linear integration broken**: Check API key, cycle URL format
-5. **Build fails**: Run `cd web && npm install && npm run build`
+1. **WebSocket connection fails**: Check port, firewall, CORS (upgrader allows all origins)
+2. **Votes not updating**: Check `broadcastVoteStatus()` is called after estimate in server.go
+3. **Confetti not showing**: Check consensus logic in Confetti.tsx (votes within 2 points, min 2 voters)
+4. **Vote count wrong**: Check VoteStatus component receives voteStatus messages correctly
+5. **Linear integration broken**: Check API key in config, cycle URL format
+6. **Build fails**: Run `cd web && npm install && npm run build`
+7. **Auto-reconnect failing**: Check localStorage keys (poker_active_session, poker_username, etc.)
 
 ---
 
@@ -915,8 +1021,10 @@ console.log(gameState.votes);
 - **Preserve state flow**: Maintain unidirectional data flow (action → WebSocket → server → broadcast → state update)
 - **Handle edge cases**: Empty votes, disconnections, race conditions
 - **Update both sides**: Backend + frontend for any protocol changes
-- **Use Tailwind**: All styling should use Tailwind utility classes
+- **Use Tailwind**: All styling should use Tailwind utility classes with HSL CSS custom properties
 - **Early returns**: Use guard clauses for cleaner code
+- **Check component usage**: Before modifying, verify component is actually used in the app (e.g., IssueCard exists but isn't used)
+- **Use Panel component**: For consistent card-based UI elements
 
 ### DON'Ts ❌
 

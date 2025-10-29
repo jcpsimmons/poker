@@ -9,7 +9,7 @@ export const EstimateSelector = () => {
   return (
     <Panel 
       title="VOTE" 
-      className="w-80 min-h-[400px] flex flex-col"
+      className="w-full md:w-80 min-h-[400px] flex flex-col"
       contentClassName="flex flex-col flex-1"
     >
       <div className="space-y-1.5 flex-1">
@@ -22,7 +22,7 @@ export const EstimateSelector = () => {
               onClick={() => vote(option.points)}
               disabled={gameState.revealed}
               className={cn(
-                "w-full text-left p-2.5 rounded border transition-all disabled:cursor-not-allowed disabled:opacity-50 text-sm font-mono",
+                "w-full text-left p-2.5 rounded border transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 text-sm font-mono",
                 isSelected
                   ? "bg-foreground text-background border-foreground"
                   : "bg-transparent hover:bg-muted border-border/50 text-foreground"

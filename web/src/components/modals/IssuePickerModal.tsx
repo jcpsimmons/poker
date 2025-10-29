@@ -26,11 +26,23 @@ export const IssuePickerModal = ({ isOpen, onClose }: IssuePickerModalProps) => 
         false
       );
       onClose();
+    } else if (gameState.queueItems.length > 0 && !isCustomMode) {
+      // If no pending issue but queue has items, load first item from queue
+      const firstItem = gameState.queueItems[0];
+      confirmIssue(firstItem.identifier, -1, firstItem.source === "custom");
+      onClose();
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div className="bg-card border border-border/50 rounded p-6 max-w-2xl w-full mx-4">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-medium text-foreground font-mono uppercase tracking-wider">
@@ -38,14 +50,14 @@ export const IssuePickerModal = ({ isOpen, onClose }: IssuePickerModalProps) => 
           </h2>
           <button
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground transition-colors"
+            className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         <div className="space-y-4">
-          {gameState.pendingIssue && gameState.pendingIssue.source === "linear" && !isCustomMode ? (
+          {gameState.pendingIssue && gameState.pendingIssue.source === "linear" && !isCustomMode && (
             <div className="bg-muted border border-border/50 rounded p-4">
               <div className="text-foreground font-medium text-sm mb-2 font-mono">
                 {gameState.pendingIssue.identifier}: {gameState.pendingIssue.title}
@@ -66,7 +78,18 @@ export const IssuePickerModal = ({ isOpen, onClose }: IssuePickerModalProps) => 
                 </a>
               )}
             </div>
-          ) : null}
+          )}
+          
+          {!gameState.pendingIssue && gameState.queueItems.length > 0 && !isCustomMode && (
+            <div className="bg-muted border border-border/50 rounded p-4">
+              <div className="text-foreground font-medium text-sm mb-2 font-mono">
+                Queue has {gameState.queueItems.length} item(s). Load the first item?
+              </div>
+              <div className="text-xs font-mono text-muted-foreground">
+                {gameState.queueItems[0].identifier}: {gameState.queueItems[0].title}
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="text-foreground font-medium block mb-2 text-xs font-mono uppercase">
@@ -89,7 +112,7 @@ export const IssuePickerModal = ({ isOpen, onClose }: IssuePickerModalProps) => 
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <button
               onClick={() => setIsCustomMode(!isCustomMode)}
-              className="text-foreground hover:text-foreground/80 font-mono text-xs"
+              className="text-foreground hover:text-foreground/80 font-mono text-xs cursor-pointer"
             >
               {isCustomMode ? "← Back to Linear issue" : "→ Use custom issue instead"}
             </button>
@@ -99,7 +122,7 @@ export const IssuePickerModal = ({ isOpen, onClose }: IssuePickerModalProps) => 
         <div className="mt-6 flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 border border-border/50 bg-transparent hover:bg-muted text-foreground font-mono text-xs py-2 px-4 rounded transition-all"
+            className="flex-1 border border-border/50 bg-transparent hover:bg-muted text-foreground font-mono text-xs py-2 px-4 rounded transition-all cursor-pointer"
           >
             CANCEL
           </button>
@@ -107,9 +130,9 @@ export const IssuePickerModal = ({ isOpen, onClose }: IssuePickerModalProps) => 
             onClick={handleSubmit}
             disabled={
               (isCustomMode && !customIssue.trim()) ||
-              (!isCustomMode && !gameState.pendingIssue)
+              (!isCustomMode && !gameState.pendingIssue && gameState.queueItems.length === 0)
             }
-            className="flex-1 bg-foreground hover:bg-foreground/90 text-background font-mono text-xs py-2 px-4 rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 bg-foreground hover:bg-foreground/90 text-background font-mono text-xs py-2 px-4 rounded transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             LOAD ISSUE
           </button>

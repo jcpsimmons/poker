@@ -16,11 +16,20 @@ const (
 	CurrentEstimate  MessageType = "currentEstimate"
 	ClearBoard       MessageType = "clearBoard"
 	VoteStatus       MessageType = "voteStatus"
+	JoinError        MessageType = "joinError"
 	// Linear queue management
 	MessageIssueSuggested MessageType = "issueSuggested"
 	MessageIssueConfirm   MessageType = "issueConfirm"
 	MessageIssueLoaded    MessageType = "issueLoaded"
 	MessageIssueStale     MessageType = "issueStale"
+	// Queue management
+	MessageQueueSync    MessageType = "queueSync"
+	MessageQueueAdd     MessageType = "queueAdd"
+	MessageQueueUpdate  MessageType = "queueUpdate"
+	MessageQueueDelete  MessageType = "queueDelete"
+	MessageQueueReorder MessageType = "queueReorder"
+	// Linear estimate assignment
+	MessageAssignEstimate MessageType = "assignEstimate"
 )
 
 type Message struct {
@@ -74,6 +83,19 @@ type LinearIssue struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	URL         string `json:"url"`
+	Priority    *int64 `json:"priority,omitempty"`
+}
+
+// QueueItem represents an item in the voting queue (Linear or custom)
+type QueueItem struct {
+	ID          string `json:"id"`
+	Source      string `json:"source"` // "linear" | "custom"
+	Identifier  string `json:"identifier"`
+	Title       string `json:"title"`
+	Description string `json:"description,omitempty"`
+	URL         string `json:"url,omitempty"`
+	LinearID    string `json:"linearId,omitempty"` // For Linear issues only
+	Index       int    `json:"index"`
 }
 
 // CurrentIssuePayload includes both the issue text and optional Linear metadata
@@ -134,4 +156,65 @@ type IssueConfirmMessage struct {
 type IssueLoadedMessage struct {
 	Type    MessageType        `json:"type"`
 	Payload IssueLoadedPayload `json:"payload"`
+}
+
+// QueueSyncPayload contains the full queue state
+type QueueSyncPayload struct {
+	Items []QueueItem `json:"items"`
+}
+
+// QueueSyncMessage wraps QueueSyncPayload
+type QueueSyncMessage struct {
+	Type    MessageType      `json:"type"`
+	Payload QueueSyncPayload `json:"payload"`
+}
+
+// QueueAddPayload for adding a custom item to queue
+type QueueAddPayload struct {
+	Identifier  string `json:"identifier"`
+	Title       string `json:"title"`
+	Description string `json:"description,omitempty"`
+	Index       *int   `json:"index,omitempty"` // Optional position (default: end)
+}
+
+// QueueAddMessage wraps QueueAddPayload
+type QueueAddMessage struct {
+	Type    MessageType     `json:"type"`
+	Payload QueueAddPayload `json:"payload"`
+}
+
+// QueueUpdatePayload for updating a queue item (custom only)
+type QueueUpdatePayload struct {
+	ID          string `json:"id"`
+	Identifier  string `json:"identifier,omitempty"`
+	Title       string `json:"title,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+// QueueUpdateMessage wraps QueueUpdatePayload
+type QueueUpdateMessage struct {
+	Type    MessageType        `json:"type"`
+	Payload QueueUpdatePayload `json:"payload"`
+}
+
+// QueueDeletePayload for removing an item from queue
+type QueueDeletePayload struct {
+	ID string `json:"id"`
+}
+
+// QueueDeleteMessage wraps QueueDeletePayload
+type QueueDeleteMessage struct {
+	Type    MessageType        `json:"type"`
+	Payload QueueDeletePayload `json:"payload"`
+}
+
+// QueueReorderPayload for reordering queue items
+type QueueReorderPayload struct {
+	ItemIDs []string `json:"itemIds"` // Array of IDs in new order
+}
+
+// QueueReorderMessage wraps QueueReorderPayload
+type QueueReorderMessage struct {
+	Type    MessageType         `json:"type"`
+	Payload QueueReorderPayload `json:"payload"`
 }

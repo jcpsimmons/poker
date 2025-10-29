@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { PokerProvider } from "./contexts/PokerContext";
 import { JoinPage } from "./pages/JoinPage";
 import { GamePage } from "./pages/GamePage";
+import { Toaster } from "./components/ui/sonner";
 
 function App() {
   // Check if there's an active session on mount
@@ -32,6 +33,7 @@ function App() {
       ) : (
         <GamePage onLeave={handleLeave} />
       )}
+      <Toaster />
     </PokerProvider>
   );
 }

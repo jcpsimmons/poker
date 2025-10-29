@@ -14,11 +14,23 @@ export const MessageType = {
   CurrentEstimate: "currentEstimate",
   ClearBoard: "clearBoard",
   VoteStatus: "voteStatus",
+  JoinError: "joinError",
   // Linear queue management
   IssueSuggested: "issueSuggested",
   IssueConfirm: "issueConfirm",
   IssueLoaded: "issueLoaded",
   IssueStale: "issueStale",
+  // Queue management
+  QueueSync: "queueSync",
+  QueueAdd: "queueAdd",
+  QueueUpdate: "queueUpdate",
+  QueueDelete: "queueDelete",
+  QueueReorder: "queueReorder",
+  // Linear estimate assignment
+  AssignEstimate: "assignEstimate",
+  EstimateAssignmentSuccess: "estimateAssignmentSuccess",
+  EstimateAssignmentError: "estimateAssignmentError",
+  AutoAdvance: "autoAdvance",
 } as const;
 
 export type MessageType = typeof MessageType[keyof typeof MessageType];
@@ -59,6 +71,44 @@ export interface LinearIssue {
   title: string;
   description: string;
   url: string;
+  priority?: number;
+}
+
+export interface QueueItem {
+  id: string;
+  source: string; // "linear" | "custom"
+  identifier: string;
+  title: string;
+  description?: string;
+  url?: string;
+  linearId?: string;
+  index: number;
+}
+
+export interface QueueSyncPayload {
+  items: QueueItem[];
+}
+
+export interface QueueAddPayload {
+  identifier: string;
+  title: string;
+  description?: string;
+  index?: number;
+}
+
+export interface QueueUpdatePayload {
+  id: string;
+  identifier?: string;
+  title?: string;
+  description?: string;
+}
+
+export interface QueueDeletePayload {
+  id: string;
+}
+
+export interface QueueReorderPayload {
+  itemIds: string[];
 }
 
 export interface CurrentIssuePayload {
@@ -114,6 +164,7 @@ export interface GameState {
   averagePoints: string;
   roundNumber: number;
   pendingIssue?: IssueSuggestedPayload;
+  queueItems: QueueItem[];
 }
 
 export interface Vote {
@@ -127,6 +178,11 @@ export interface EstimateOption {
   label: string;
   description: string;
   icon: string;
+}
+
+export interface QueueSyncMessage {
+  type: typeof MessageType.QueueSync;
+  payload: QueueSyncPayload;
 }
 
 export const ESTIMATE_OPTIONS: EstimateOption[] = [

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 )
@@ -26,6 +27,7 @@ type LinearIssue struct {
 	Description string
 	URL         string
 	Estimate    *int64
+	Priority    *int64
 }
 
 type CycleInfo struct {
@@ -276,6 +278,7 @@ func (c *LinearClient) FetchCycleIssuesWithoutEstimates(cycleInfo *CycleInfo) ([
 				description
 				url
 				estimate
+				priority
 			}
 		}
 	}`, cycleID)
@@ -289,6 +292,7 @@ func (c *LinearClient) FetchCycleIssuesWithoutEstimates(cycleInfo *CycleInfo) ([
 				Description string `json:"description"`
 				URL         string `json:"url"`
 				Estimate    *int64 `json:"estimate"`
+				Priority    *int64 `json:"priority"`
 			} `json:"nodes"`
 		} `json:"issues"`
 	}
@@ -306,8 +310,27 @@ func (c *LinearClient) FetchCycleIssuesWithoutEstimates(cycleInfo *CycleInfo) ([
 			Description: node.Description,
 			URL:         node.URL,
 			Estimate:    node.Estimate,
+			Priority:    node.Priority,
 		})
 	}
+
+	// Sort by priority: 1=Urgent (highest), 2=High, 3=Medium, 4=Low, 0/no priority last
+	sort.Slice(issues, func(i, j int) bool {
+		priI := issues[i].Priority
+		priJ := issues[j].Priority
+
+		// Treat nil as lowest priority (highest number)
+		var valI, valJ int64 = 999, 999
+		if priI != nil && *priI > 0 {
+			valI = *priI
+		}
+		if priJ != nil && *priJ > 0 {
+			valJ = *priJ
+		}
+
+		// Sort ascending: 1 (Urgent) comes first, then 2, 3, 4, then 999 (no priority)
+		return valI < valJ
+	})
 
 	return issues, nil
 }
@@ -350,6 +373,46 @@ func (c *LinearClient) PostComment(issueID string, commentBody string) error {
 
 	if !result.CommentCreate.Success {
 		return fmt.Errorf("comment creation was not successful")
+	}
+
+	return nil
+}
+
+// UpdateEstimate updates the estimate field on a Linear issue
+func (c *LinearClient) UpdateEstimate(issueID string, estimate int64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	mutationStr := fmt.Sprintf(`
+		mutation {
+			issueUpdate(id: "%s", input: {
+				estimate: %d
+			}) {
+				success
+				issue {
+					id
+					estimate
+				}
+			}
+		}
+	`, issueID, estimate)
+
+	var result struct {
+		IssueUpdate struct {
+			Success bool `json:"success"`
+			Issue   *struct {
+				ID       string `json:"id"`
+				Estimate *int64 `json:"estimate"`
+			} `json:"issue"`
+		} `json:"issueUpdate"`
+	}
+
+	if err := c.executeQuery(ctx, mutationStr, &result); err != nil {
+		return fmt.Errorf("failed to update estimate: %w", err)
+	}
+
+	if !result.IssueUpdate.Success {
+		return fmt.Errorf("estimate update was not successful")
 	}
 
 	return nil

@@ -3,6 +3,10 @@ import {
   type Message,
   type JoinMessage,
   type IssueConfirmPayload,
+  type QueueAddPayload,
+  type QueueUpdatePayload,
+  type QueueDeletePayload,
+  type QueueReorderPayload,
 } from "../types/poker";
 
 export type MessageHandler = (message: Message) => void;
@@ -32,6 +36,15 @@ export class PokerWebSocket {
     }
 
     return new Promise((resolve, reject) => {
+      // Add connection timeout (10 seconds)
+      const connectionTimeout = setTimeout(() => {
+        if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
+          console.error("WebSocket connection timeout");
+          this.ws.close();
+          reject(new Error("Connection timeout - server did not respond"));
+        }
+      }, 10000);
+
       try {
         // Close existing connection if any
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -43,6 +56,7 @@ export class PokerWebSocket {
 
         this.ws.onopen = () => {
           console.log("WebSocket connected");
+          clearTimeout(connectionTimeout);
           
           // Notify reconnect handlers if this was a reconnection
           if (this.isReconnecting) {
@@ -66,11 +80,13 @@ export class PokerWebSocket {
 
         this.ws.onerror = (error) => {
           console.error("WebSocket error:", error);
+          clearTimeout(connectionTimeout);
           reject(error);
         };
 
         this.ws.onclose = (event) => {
           console.log("WebSocket closed", event.code, event.reason);
+          clearTimeout(connectionTimeout);
           
           // Only auto-reconnect for unexpected closures (not normal closures)
           if (this.shouldReconnect && 
@@ -88,6 +104,7 @@ export class PokerWebSocket {
           }
         };
       } catch (error) {
+        clearTimeout(connectionTimeout);
         reject(error);
       }
     });
@@ -182,6 +199,56 @@ export class PokerWebSocket {
 
   isConnected(): boolean {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
+  }
+
+  // Queue management methods
+  sendQueueAdd(identifier: string, title: string, description?: string, index?: number) {
+    const payload: QueueAddPayload = {
+      identifier,
+      title,
+      description,
+      index,
+    };
+    this.send({
+      type: MessageType.QueueAdd,
+      payload,
+    });
+  }
+
+  sendQueueUpdate(id: string, identifier?: string, title?: string, description?: string) {
+    const payload: QueueUpdatePayload = {
+      id,
+      identifier,
+      title,
+      description,
+    };
+    this.send({
+      type: MessageType.QueueUpdate,
+      payload,
+    });
+  }
+
+  sendQueueDelete(id: string) {
+    const payload: QueueDeletePayload = { id };
+    this.send({
+      type: MessageType.QueueDelete,
+      payload,
+    });
+  }
+
+  sendQueueReorder(itemIds: string[]) {
+    const payload: QueueReorderPayload = { itemIds };
+    this.send({
+      type: MessageType.QueueReorder,
+      payload,
+    });
+  }
+
+  sendAssignEstimate() {
+    this.send({
+      type: MessageType.AssignEstimate,
+      payload: "",
+    });
   }
 }
 

@@ -6,9 +6,12 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
+	"unicode/utf8"
 
 	"github.com/jcpsimmons/poker/linear"
 	"github.com/jcpsimmons/poker/messaging"
@@ -36,6 +39,14 @@ var currentIssueIndex int = -1
 var currentLinearIssue *types.LinearIssue
 var pendingQueueIndex int = -1
 var confirmedIssues = make(map[string]bool)
+
+// Queue state
+var queueItems []types.QueueItem
+var currentQueueIndex int = -1 // Track which queue item is currently being voted on (not used yet, reserved for future)
+var queueItemCounter int = 0   // For generating unique IDs for custom items
+
+// Track if we just assigned an estimate (for auto-advance notification)
+var justAssignedEstimate bool = false
 
 // mutex is used to synchronize access to the clients map.
 var mutex = &sync.Mutex{}
@@ -77,7 +88,33 @@ func SetLinearIssues(issues []types.LinearIssue, client *linear.LinearClient) {
 	linearClient = client
 	currentIssueIndex = -1
 	pendingQueueIndex = 0 // First issue ready to be suggested
+
+	// Initialize queue from Linear issues
+	queueItems = make([]types.QueueItem, 0, len(issues))
+	for i, issue := range issues {
+		queueItems = append(queueItems, types.QueueItem{
+			ID:          issue.ID,
+			Source:      "linear",
+			Identifier:  issue.Identifier,
+			Title:       issue.Title,
+			Description: issue.Description,
+			URL:         issue.URL,
+			LinearID:    issue.ID,
+			Index:       i,
+		})
+	}
+	currentQueueIndex = -1
+	queueItemCounter = 0
+
 	log.Printf("Linear integration enabled with %d issues", len(issues))
+	log.Printf("Queue initialized with %d items", len(queueItems))
+
+	// Broadcast queue to all connected clients
+	mutex.Lock()
+	if len(clients) > 0 {
+		broadcastQueueSyncUnlocked()
+	}
+	mutex.Unlock()
 }
 
 // handler handles incoming WebSocket connections.
@@ -135,12 +172,28 @@ func handleMessages(client *Client) {
 			}
 
 			handleJoin(username, client, isHost)
-			// send cur issue
-			curIssueMessage := types.Message{
-				Type:    types.CurrentIssue,
-				Payload: currentIssue,
+			// send cur issue (with linearIssue if applicable)
+			var currentIssuePayload types.CurrentIssuePayload
+			currentIssuePayload.Text = currentIssue
+			if currentLinearIssue != nil {
+				currentIssuePayload.LinearIssue = currentLinearIssue
 			}
-			sendClientMessage(client, curIssueMessage)
+
+			currentIssuePayloadJSON, err := json.Marshal(currentIssuePayload)
+			if err == nil {
+				curIssueMessage := types.Message{
+					Type:    types.CurrentIssue,
+					Payload: string(currentIssuePayloadJSON),
+				}
+				sendClientMessage(client, curIssueMessage)
+			} else {
+				// Fallback to simple string
+				curIssueMessage := types.Message{
+					Type:    types.CurrentIssue,
+					Payload: currentIssue,
+				}
+				sendClientMessage(client, curIssueMessage)
+			}
 
 			pointAvgStr := strconv.FormatInt(int64(getPointAverage()), 10)
 			estimateMessage := types.Message{
@@ -151,6 +204,8 @@ func handleMessages(client *Client) {
 
 			broadcastParticipCount(client)
 			broadcastVoteStatus(client)
+			// Send queue sync to newly joined client
+			broadcastQueueSync()
 		case types.NewIssue:
 			// If we have Linear issues queued, use next from queue
 			if linearClient != nil && currentIssueIndex >= 0 && currentIssueIndex < len(linearIssues) {
@@ -222,6 +277,41 @@ func handleMessages(client *Client) {
 			}
 			handleIssueConfirm(confirmMsg.Payload, client)
 
+		case types.MessageQueueAdd:
+			var addMsg types.QueueAddMessage
+			if err := json.Unmarshal(message, &addMsg); err != nil {
+				log.Println("Error parsing queue add:", err)
+				break
+			}
+			handleQueueAdd(addMsg.Payload, client)
+
+		case types.MessageQueueUpdate:
+			var updateMsg types.QueueUpdateMessage
+			if err := json.Unmarshal(message, &updateMsg); err != nil {
+				log.Println("Error parsing queue update:", err)
+				break
+			}
+			handleQueueUpdate(updateMsg.Payload, client)
+
+		case types.MessageQueueDelete:
+			var deleteMsg types.QueueDeleteMessage
+			if err := json.Unmarshal(message, &deleteMsg); err != nil {
+				log.Println("Error parsing queue delete:", err)
+				break
+			}
+			handleQueueDelete(deleteMsg.Payload, client)
+
+		case types.MessageQueueReorder:
+			var reorderMsg types.QueueReorderMessage
+			if err := json.Unmarshal(message, &reorderMsg); err != nil {
+				log.Println("Error parsing queue reorder:", err)
+				break
+			}
+			handleQueueReorder(reorderMsg.Payload, client)
+
+		case types.MessageAssignEstimate:
+			handleAssignEstimate(client)
+
 		case types.Leave:
 			broadcastParticipCount(client)
 		default:
@@ -230,12 +320,123 @@ func handleMessages(client *Client) {
 	}
 }
 
+// validateUsername checks if a username meets requirements
+func validateUsername(username string) (string, error) {
+	// Trim whitespace
+	trimmed := strings.TrimSpace(username)
+
+	// Check if empty
+	if trimmed == "" {
+		return "", fmt.Errorf("username is required")
+	}
+
+	// Check minimum length
+	length := utf8.RuneCountInString(trimmed)
+	if length < 2 {
+		return "", fmt.Errorf("username must be at least 2 characters")
+	}
+
+	// Check maximum length
+	if length > 20 {
+		return "", fmt.Errorf("username must be 20 characters or less")
+	}
+
+	// Check for valid characters (alphanumeric, hyphens, underscores, spaces)
+	validPattern := regexp.MustCompile(`^[a-zA-Z0-9 _-]+$`)
+	if !validPattern.MatchString(trimmed) {
+		return "", fmt.Errorf("username can only contain letters, numbers, spaces, hyphens, and underscores")
+	}
+
+	// Check if username is only whitespace
+	if strings.TrimSpace(strings.ReplaceAll(trimmed, " ", "")) == "" {
+		return "", fmt.Errorf("username cannot be only spaces")
+	}
+
+	return trimmed, nil
+}
+
 func handleJoin(username string, sender *Client, isHost bool) {
-	sender.UserID = username
+	// Validate username
+	validUsername, err := validateUsername(username)
+	if err != nil {
+		log.Printf("Invalid username attempt: %s - %v", username, err)
+		// Send error message to client
+		errorMsg := types.Message{
+			Type:    types.JoinError,
+			Payload: err.Error(),
+		}
+		byteMessage := messaging.MarshallMessage(errorMsg)
+		sender.Conn.WriteMessage(websocket.TextMessage, byteMessage)
+		// Close connection
+		sender.Conn.Close()
+		delete(clients, sender)
+		return
+	}
+
+	sender.UserID = validUsername
 	sender.CurrentEstimate = 0
 	sender.IsHost = isHost
 
-	log.Println("User joined: ", username)
+	log.Println("User joined: ", validUsername)
+
+	// Auto-load first issue if in Linear mode, host joins, no current issue, and queue has Linear items
+	if isHost && linearClient != nil && currentIssue == "" && len(queueItems) > 0 {
+		// Check if first item is a Linear issue
+		firstItem := queueItems[0]
+		if firstItem.Source == "linear" && firstItem.LinearID != "" {
+			// Find the Linear issue by ID
+			var linearIssue *types.LinearIssue
+			var issueIndex int = -1
+			for i := range linearIssues {
+				if linearIssues[i].ID == firstItem.LinearID {
+					linearIssue = &linearIssues[i]
+					issueIndex = i
+					break
+				}
+			}
+
+			if linearIssue != nil {
+				currentLinearIssue = linearIssue
+				currentIssueIndex = issueIndex
+				currentIssue = fmt.Sprintf("%s: %s", linearIssue.Identifier, linearIssue.Title)
+				pendingQueueIndex = -1
+
+				// Broadcast issue loaded to all clients
+				loadedMsg := types.IssueLoadedMessage{
+					Type: types.MessageIssueLoaded,
+					Payload: types.IssueLoadedPayload{
+						Identifier: linearIssue.Identifier,
+						Title:      currentIssue,
+						QueueIndex: 0,
+					},
+				}
+				byteMessage := messaging.MarshallMessage(loadedMsg)
+				broadcast(byteMessage, sender)
+
+				// Send as CurrentIssue for backward compatibility
+				var currentIssuePayload types.CurrentIssuePayload
+				currentIssuePayload.Text = currentIssue
+				currentIssuePayload.LinearIssue = currentLinearIssue
+
+				currentIssuePayloadJSON, err := json.Marshal(currentIssuePayload)
+				if err == nil {
+					currentIssueMsg := types.Message{
+						Type:    types.CurrentIssue,
+						Payload: string(currentIssuePayloadJSON),
+					}
+					byteMessageCompat := messaging.MarshallMessage(currentIssueMsg)
+					broadcast(byteMessageCompat, sender)
+				}
+
+				// Remove first issue from queue
+				removeQueueItem(firstItem.Identifier, false)
+				broadcastQueueSync()
+
+				log.Printf("Auto-loaded first Linear issue: %s", linearIssue.Identifier)
+				return
+			}
+		}
+	}
 
 	// If host joins and there's a pending issue, send suggestion
 	if isHost && linearClient != nil && pendingQueueIndex >= 0 && pendingQueueIndex < len(linearIssues) {
@@ -497,30 +698,74 @@ func suggestNoMoreIssuesToHosts() {
 
 // handleIssueConfirm validates and processes an issue confirmation from the host
 func handleIssueConfirm(payload types.IssueConfirmPayload, sender *Client) {
+	log.Printf("📥 Received issue confirm: identifier=%s, queueIndex=%d, isCustom=%v, requestID=%s", payload.Identifier, payload.QueueIndex, payload.IsCustom, payload.RequestID)
+
 	// Check if already confirmed (idempotency)
 	if confirmedIssues[payload.RequestID] {
 		log.Printf("Issue confirm %s already processed (idempotent)", payload.RequestID)
 		return
 	}
 
-	// Validate queue index
-	if payload.QueueIndex != pendingQueueIndex {
-		log.Printf("Stale queue index: expected %d, got %d", pendingQueueIndex, payload.QueueIndex)
-		// Send stale message and re-suggest current issue
-		staleMsg := types.Message{
-			Type:    types.MessageIssueStale,
-			Payload: "Queue has changed, please refresh",
+	var issueTitle string
+	var loadedFromQueue bool = false
+
+	// If QueueIndex is -1, try to load directly from queue
+	if payload.QueueIndex == -1 {
+		// Lock mutex to safely access queueItems
+		mutex.Lock()
+		// Find the item in the queue by identifier
+		var foundIdentifier string
+		for i := range queueItems {
+			if queueItems[i].Identifier == payload.Identifier &&
+				((payload.IsCustom && queueItems[i].Source == "custom") ||
+					(!payload.IsCustom && queueItems[i].Source == "linear")) {
+				foundIdentifier = payload.Identifier
+				loadedFromQueue = true
+				break
+			}
 		}
-		byteMessage := messaging.MarshallMessage(staleMsg)
-		sender.Conn.WriteMessage(websocket.TextMessage, byteMessage)
-		suggestIssueToHost(sender)
-		return
+		mutex.Unlock()
+
+		if loadedFromQueue {
+			log.Printf("✅ Found issue %s in queue, loading from queue", payload.Identifier)
+			// Update pendingQueueIndex to match (for Linear issues)
+			if !payload.IsCustom && linearClient != nil {
+				// Find the index in linearIssues
+				for j := range linearIssues {
+					if linearIssues[j].Identifier == foundIdentifier {
+						pendingQueueIndex = j
+						log.Printf("📍 Set pendingQueueIndex to %d for Linear issue", j)
+						break
+					}
+				}
+			}
+		} else {
+			log.Printf("❌ Issue %s not found in queue for direct loading (queue has %d items)", payload.Identifier, len(queueItems))
+			// Fall back to suggesting next issue if available
+			if !payload.IsCustom && linearClient != nil && pendingQueueIndex >= 0 && pendingQueueIndex < len(linearIssues) {
+				suggestIssueToHost(sender)
+			}
+			return
+		}
+	} else {
+		// Validate queue index for suggested issues
+		if payload.QueueIndex != pendingQueueIndex {
+			log.Printf("Stale queue index: expected %d, got %d", pendingQueueIndex, payload.QueueIndex)
+			// Send stale message and re-suggest current issue
+			staleMsg := types.Message{
+				Type:    types.MessageIssueStale,
+				Payload: "Queue has changed, please refresh",
+			}
+			byteMessage := messaging.MarshallMessage(staleMsg)
+			sender.Conn.WriteMessage(websocket.TextMessage, byteMessage)
+			suggestIssueToHost(sender)
+			return
+		}
 	}
 
 	// Mark as confirmed
 	confirmedIssues[payload.RequestID] = true
 
-	var issueTitle string
 	if payload.IsCustom {
 		// Custom issue
 		issueTitle = payload.Identifier
@@ -528,13 +773,29 @@ func handleIssueConfirm(payload types.IssueConfirmPayload, sender *Client) {
 		currentLinearIssue = nil
 		log.Printf("Custom issue confirmed: %s", issueTitle)
 	} else {
-		// Linear issue - increment index and set current
-		currentIssueIndex = pendingQueueIndex
-		issue := linearIssues[currentIssueIndex]
-		currentLinearIssue = &issue
-		issueTitle = fmt.Sprintf("%s: %s", issue.Identifier, issue.Title)
-		currentIssue = issueTitle
-		log.Printf("Linear issue confirmed and loaded: %s", issue.Identifier)
+		// Linear issue - use pendingQueueIndex (set above if loaded from queue)
+		if pendingQueueIndex >= 0 && pendingQueueIndex < len(linearIssues) {
+			currentIssueIndex = pendingQueueIndex
+			issue := linearIssues[currentIssueIndex]
+			currentLinearIssue = &issue
+			issueTitle = fmt.Sprintf("%s: %s", issue.Identifier, issue.Title)
+			currentIssue = issueTitle
+			log.Printf("Linear issue confirmed and loaded: %s", issue.Identifier)
+		} else {
+			log.Printf("Invalid pendingQueueIndex: %d (linearIssues length: %d)", pendingQueueIndex, len(linearIssues))
+			return
+		}
+	}
+
+	// If we just assigned an estimate, broadcast auto-advance notification to all clients
+	if justAssignedEstimate {
+		justAssignedEstimate = false // Reset flag
+		autoAdvanceMsg := types.Message{
+			Type:    "autoAdvance",
+			Payload: "Advancing to next issue in queue...",
+		}
+		byteAutoAdvance := messaging.MarshallMessage(autoAdvanceMsg)
+		broadcast(byteAutoAdvance, sender)
 	}
 
 	// Broadcast issue loaded to all clients
@@ -549,14 +810,316 @@ func handleIssueConfirm(payload types.IssueConfirmPayload, sender *Client) {
 	byteMessage := messaging.MarshallMessage(loadedMsg)
 	broadcast(byteMessage, sender)
 
-	// Also send as CurrentIssue for backward compatibility
-	currentIssueMsg := types.Message{
-		Type:    types.CurrentIssue,
-		Payload: issueTitle,
+	// Also send as CurrentIssue for backward compatibility (with linearIssue if applicable)
+	var currentIssuePayload types.CurrentIssuePayload
+	currentIssuePayload.Text = issueTitle
+	if currentLinearIssue != nil {
+		currentIssuePayload.LinearIssue = currentLinearIssue
 	}
-	byteMessageCompat := messaging.MarshallMessage(currentIssueMsg)
-	broadcast(byteMessageCompat, sender)
+
+	currentIssuePayloadJSON, err := json.Marshal(currentIssuePayload)
+	if err != nil {
+		log.Printf("Error marshalling current issue payload: %v", err)
+		// Fallback to simple string
+		currentIssueMsg := types.Message{
+			Type:    types.CurrentIssue,
+			Payload: issueTitle,
+		}
+		byteMessageCompat := messaging.MarshallMessage(currentIssueMsg)
+		broadcast(byteMessageCompat, sender)
+	} else {
+		currentIssueMsg := types.Message{
+			Type:    types.CurrentIssue,
+			Payload: string(currentIssuePayloadJSON),
+		}
+		byteMessageCompat := messaging.MarshallMessage(currentIssueMsg)
+		broadcast(byteMessageCompat, sender)
+	}
 
 	// Clear pending index after successful confirmation
 	pendingQueueIndex = -1
+
+	// Remove confirmed issue from queue
+	removeQueueItem(payload.Identifier, payload.IsCustom)
+	broadcastQueueSync()
+}
+
+// broadcastQueueSync sends the current queue state to all clients
+func broadcastQueueSync() {
+	mutex.Lock()
+	defer mutex.Unlock()
+	broadcastQueueSyncUnlocked()
+}
+
+// broadcastQueueSyncUnlocked sends queue sync (caller must hold mutex)
+func broadcastQueueSyncUnlocked() {
+	syncMsg := types.QueueSyncMessage{
+		Type: types.MessageQueueSync,
+		Payload: types.QueueSyncPayload{
+			Items: queueItems,
+		},
+	}
+	byteMessage := messaging.MarshallMessage(syncMsg)
+
+	for client := range clients {
+		if err := client.Conn.WriteMessage(websocket.TextMessage, byteMessage); err != nil {
+			log.Printf("Error sending queue sync to client %s: %v", client.UserID, err)
+		}
+	}
+}
+
+// removeQueueItem removes an item from the queue by identifier or ID
+func removeQueueItem(identifier string, isCustom bool) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	newQueue := make([]types.QueueItem, 0)
+	for _, item := range queueItems {
+		shouldRemove := false
+
+		if isCustom {
+			// For custom items, match by identifier (since ID might be different format)
+			if item.Source == "custom" && item.Identifier == identifier {
+				shouldRemove = true
+			}
+		} else {
+			// For Linear items, match by LinearID
+			if item.Source == "linear" && item.LinearID != "" {
+				// Check if this matches the identifier
+				linearIssue := findLinearIssueByIdentifier(identifier)
+				if linearIssue != nil && item.LinearID == linearIssue.ID {
+					shouldRemove = true
+				}
+			}
+		}
+
+		if shouldRemove {
+			continue
+		}
+
+		// Recalculate index
+		item.Index = len(newQueue)
+		newQueue = append(newQueue, item)
+	}
+
+	queueItems = newQueue
+	log.Printf("Removed item from queue, %d items remaining", len(queueItems))
+}
+
+// findLinearIssueByIdentifier finds a Linear issue by its identifier
+func findLinearIssueByIdentifier(identifier string) *types.LinearIssue {
+	for i := range linearIssues {
+		if linearIssues[i].Identifier == identifier {
+			return &linearIssues[i]
+		}
+	}
+	return nil
+}
+
+// handleQueueAdd handles adding a custom item to the queue
+func handleQueueAdd(payload types.QueueAddPayload, sender *Client) {
+	if !sender.IsHost {
+		log.Printf("Non-host attempted to add queue item")
+		return
+	}
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	queueItemCounter++
+	itemID := fmt.Sprintf("custom-%d-%d", time.Now().Unix(), queueItemCounter)
+
+	newItem := types.QueueItem{
+		ID:          itemID,
+		Source:      "custom",
+		Identifier:  payload.Identifier,
+		Title:       payload.Title,
+		Description: payload.Description,
+		Index:       len(queueItems),
+	}
+
+	// Insert at specified index or append to end
+	if payload.Index != nil && *payload.Index >= 0 && *payload.Index < len(queueItems) {
+		// Insert at position
+		newQueue := make([]types.QueueItem, 0, len(queueItems)+1)
+		newQueue = append(newQueue, queueItems[:*payload.Index]...)
+		newItem.Index = *payload.Index
+		newQueue = append(newQueue, newItem)
+		for i := *payload.Index + 1; i < len(queueItems); i++ {
+			item := queueItems[i]
+			item.Index = i + 1
+			newQueue = append(newQueue, item)
+		}
+		queueItems = newQueue
+	} else {
+		// Append to end
+		queueItems = append(queueItems, newItem)
+	}
+
+	log.Printf("Host %s added queue item: %s", sender.UserID, newItem.Identifier)
+	broadcastQueueSyncUnlocked()
+}
+
+// handleQueueUpdate handles updating a custom queue item
+func handleQueueUpdate(payload types.QueueUpdatePayload, sender *Client) {
+	if !sender.IsHost {
+		log.Printf("Non-host attempted to update queue item")
+		return
+	}
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	for i := range queueItems {
+		if queueItems[i].ID == payload.ID {
+			if queueItems[i].Source != "custom" {
+				log.Printf("Attempted to update non-custom queue item")
+				return
+			}
+
+			if payload.Identifier != "" {
+				queueItems[i].Identifier = payload.Identifier
+			}
+			if payload.Title != "" {
+				queueItems[i].Title = payload.Title
+			}
+			if payload.Description != "" {
+				queueItems[i].Description = payload.Description
+			}
+
+			log.Printf("Host %s updated queue item: %s", sender.UserID, payload.ID)
+			broadcastQueueSyncUnlocked()
+			return
+		}
+	}
+
+	log.Printf("Queue item not found for update: %s", payload.ID)
+}
+
+// handleQueueDelete handles removing an item from the queue
+func handleQueueDelete(payload types.QueueDeletePayload, sender *Client) {
+	if !sender.IsHost {
+		log.Printf("Non-host attempted to delete queue item")
+		return
+	}
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	newQueue := make([]types.QueueItem, 0)
+	found := false
+	for _, item := range queueItems {
+		if item.ID == payload.ID {
+			found = true
+			continue
+		}
+		// Recalculate index
+		item.Index = len(newQueue)
+		newQueue = append(newQueue, item)
+	}
+
+	if found {
+		queueItems = newQueue
+		log.Printf("Host %s deleted queue item: %s", sender.UserID, payload.ID)
+		broadcastQueueSyncUnlocked()
+	} else {
+		log.Printf("Queue item not found for delete: %s", payload.ID)
+	}
+}
+
+// handleQueueReorder handles reordering queue items
+func handleQueueReorder(payload types.QueueReorderPayload, sender *Client) {
+	if !sender.IsHost {
+		log.Printf("Non-host attempted to reorder queue")
+		return
+	}
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	// Create a map for quick lookup
+	itemMap := make(map[string]types.QueueItem)
+	for _, item := range queueItems {
+		itemMap[item.ID] = item
+	}
+
+	// Build new queue in the specified order
+	newQueue := make([]types.QueueItem, 0, len(payload.ItemIDs))
+	for i, id := range payload.ItemIDs {
+		if item, exists := itemMap[id]; exists {
+			item.Index = i
+			newQueue = append(newQueue, item)
+		}
+	}
+
+	// Add any items not in the reorder list (shouldn't happen, but be safe)
+	for _, item := range queueItems {
+		found := false
+		for _, id := range payload.ItemIDs {
+			if item.ID == id {
+				found = true
+				break
+			}
+		}
+		if !found {
+			item.Index = len(newQueue)
+			newQueue = append(newQueue, item)
+		}
+	}
+
+	queueItems = newQueue
+	log.Printf("Host %s reordered queue, %d items", sender.UserID, len(queueItems))
+	broadcastQueueSyncUnlocked()
+}
+
+// handleAssignEstimate assigns the current average estimate to the Linear issue
+func handleAssignEstimate(sender *Client) {
+	if !sender.IsHost {
+		log.Printf("Non-host attempted to assign estimate")
+		return
+	}
+
+	// Only allow if there's a current Linear issue and votes have been revealed
+	if currentLinearIssue == nil || linearClient == nil {
+		log.Printf("No Linear issue currently active")
+		return
+	}
+
+	// Calculate average estimate
+	average := getPointAverage()
+	if average == 0 {
+		log.Printf("No valid estimates to assign")
+		return
+	}
+
+	// Update estimate in Linear
+	err := linearClient.UpdateEstimate(currentLinearIssue.ID, average)
+	if err != nil {
+		log.Printf("Failed to assign estimate to Linear issue %s: %v", currentLinearIssue.Identifier, err)
+		// Send error message to host
+		errorMsg := types.Message{
+			Type:    "estimateAssignmentError",
+			Payload: fmt.Sprintf("Failed to assign estimate: %v", err),
+		}
+		byteMessage := messaging.MarshallMessage(errorMsg)
+		sender.Conn.WriteMessage(websocket.TextMessage, byteMessage)
+		return
+	}
+
+	log.Printf("✅ Successfully assigned estimate %d to Linear issue %s", average, currentLinearIssue.Identifier)
+
+	// Mark that we just assigned (for auto-advance notification)
+	justAssignedEstimate = true
+	log.Printf("🏷️ Set justAssignedEstimate = true")
+
+	// Send success message to host
+	successMsg := types.Message{
+		Type:    "estimateAssignmentSuccess",
+		Payload: fmt.Sprintf("Estimate %d assigned to %s", average, currentLinearIssue.Identifier),
+	}
+	byteMessage := messaging.MarshallMessage(successMsg)
+	log.Printf("📤 Sending estimateAssignmentSuccess message to host")
+	if err := sender.Conn.WriteMessage(websocket.TextMessage, byteMessage); err != nil {
+		log.Printf("❌ Error sending estimateAssignmentSuccess: %v", err)
+	}
 }

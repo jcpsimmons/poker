@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
+import { toast } from "sonner";
 import { PokerWebSocket } from "../lib/websocket";
 import type {
   GameState,
@@ -9,6 +10,7 @@ import type {
   IssueLoadedPayload,
   CurrentIssuePayload,
   VoteStatusPayload,
+  QueueSyncPayload,
 } from "../types/poker";
 
 interface PokerContextType {
@@ -21,6 +23,11 @@ interface PokerContextType {
   reveal: () => void;
   clear: () => void;
   confirmIssue: (identifier: string, queueIndex: number, isCustom: boolean) => void;
+  addQueueItem: (identifier: string, title: string, description?: string, index?: number) => void;
+  updateQueueItem: (id: string, identifier?: string, title?: string, description?: string) => void;
+  deleteQueueItem: (id: string) => void;
+  reorderQueue: (itemIds: string[]) => void;
+  assignEstimate: () => void;
 }
 
 const PokerContext = createContext<PokerContextType | null>(null);
@@ -39,6 +46,9 @@ interface PokerProviderProps {
 
 export const PokerProvider: React.FC<PokerProviderProps> = ({ children }) => {
   const [ws, setWs] = useState<PokerWebSocket | null>(null);
+  // Use refs to access latest state and ws in setTimeout callbacks
+  const gameStateRef = useRef<GameState | null>(null);
+  const wsRef = useRef<PokerWebSocket | null>(null);
   const [gameState, setGameState] = useState<GameState>(() => {
     // Restore state from localStorage if available
     const hasActiveSession = localStorage.getItem('poker_active_session') === 'true';
@@ -56,6 +66,7 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children }) => {
         revealed: false,
         averagePoints: "0",
         roundNumber: 1,
+        queueItems: [],
       };
     }
     return {
@@ -69,8 +80,18 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children }) => {
       revealed: false,
       averagePoints: "0",
       roundNumber: 1,
+      queueItems: [],
     };
   });
+
+  // Keep refs in sync with state for timeout callbacks
+  useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
+  
+  useEffect(() => {
+    wsRef.current = ws;
+  }, [ws]);
 
   const handleMessage = useCallback((message: Message) => {
     console.log("Received message:", message);
@@ -84,18 +105,20 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children }) => {
           setGameState((prev) => ({
             ...prev,
             currentIssue: payload.text,
-            linearIssue: payload.linearIssue,
+            // Use linearIssue from payload if provided, otherwise preserve existing
+            linearIssue: payload.linearIssue ?? prev.linearIssue,
             revealed: false,
             votes: [],
             myVote: undefined,
             roundNumber: prev.roundNumber + 1,
           }));
         } catch {
-          // Fallback for simple string payload
+          // Fallback for simple string payload - preserve existing linearIssue
           setGameState((prev) => ({
             ...prev,
             currentIssue: message.payload,
-            linearIssue: undefined,
+            // Don't clear linearIssue for simple string payloads if we already have one
+            // linearIssue stays as-is (prev.linearIssue)
             revealed: false,
             votes: [],
             myVote: undefined,
@@ -158,12 +181,45 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children }) => {
         const payload: IssueLoadedPayload = typeof message.payload === 'string'
           ? JSON.parse(message.payload)
           : message.payload;
-        setGameState((prev) => ({
-          ...prev,
-          currentIssue: payload.title,
-          currentIssueId: payload.identifier,
-          pendingIssue: undefined,
-        }));
+        setGameState((prev) => {
+          // Try to find Linear issue data from queue items
+          let linearIssue = prev.linearIssue;
+          
+          // Check if this is in the queue as a Linear item
+          const queueItem = prev.queueItems.find(item => 
+            item.identifier === payload.identifier && item.source === "linear"
+          );
+          
+          if (queueItem && queueItem.linearId) {
+            linearIssue = {
+              id: queueItem.linearId,
+              identifier: queueItem.identifier,
+              title: queueItem.title,
+              description: queueItem.description || "",
+              url: queueItem.url || "",
+            };
+          } else if (prev.pendingIssue && prev.pendingIssue.identifier === payload.identifier && prev.pendingIssue.source === "linear") {
+            // Fallback to pendingIssue data
+            linearIssue = {
+              id: prev.pendingIssue.identifier, // Will be updated by currentIssue message if available
+              identifier: prev.pendingIssue.identifier,
+              title: prev.pendingIssue.title,
+              description: prev.pendingIssue.description || "",
+              url: prev.pendingIssue.url || "",
+            };
+          } else if (prev.linearIssue && prev.linearIssue.identifier === payload.identifier) {
+            // Keep existing linearIssue if it matches
+            linearIssue = prev.linearIssue;
+          }
+          
+          return {
+            ...prev,
+            currentIssue: payload.title,
+            currentIssueId: payload.identifier,
+            pendingIssue: undefined,
+            linearIssue: linearIssue,
+          };
+        });
         break;
       }
 
@@ -199,18 +255,134 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children }) => {
         break;
       }
 
+      case "joinError": {
+        // This will be handled by the connect function's error handler
+        console.error("Join error from server:", message.payload);
+        break;
+      }
+
+      case "queueSync": {
+        const payload: QueueSyncPayload = typeof message.payload === 'string'
+          ? JSON.parse(message.payload)
+          : message.payload;
+        setGameState((prev) => ({
+          ...prev,
+          queueItems: payload.items || [],
+        }));
+        break;
+      }
+
+      case "estimateAssignmentSuccess": {
+        console.log("✅ estimateAssignmentSuccess received, starting auto-advance logic");
+        const messageText = typeof message.payload === 'string' ? message.payload : "Estimate assigned successfully";
+        toast.success(messageText, {
+          duration: 3000,
+        });
+
+        // Auto-advance to next issue in queue (if host and queue has items)
+        // Wait a moment for state to update (queue sync after assignment), then advance
+        // Server will broadcast autoAdvance message to everyone when issue loads
+        setTimeout(() => {
+          console.log("⏰ Auto-advance timeout fired, checking state...");
+          // Use refs to get latest state and ws
+          const currentState = gameStateRef.current;
+          const currentWs = wsRef.current;
+          console.log("📊 Current state:", {
+            isHost: currentState?.isHost,
+            hasWs: !!currentWs,
+            queueLength: currentState?.queueItems?.length,
+            queueItems: currentState?.queueItems?.map(i => i.identifier)
+          });
+          
+          if (currentState && currentState.isHost && currentWs) {
+            // Get the first item from the queue (current issue should already be removed)
+            if (currentState.queueItems && currentState.queueItems.length > 0) {
+              const nextItem = currentState.queueItems[0];
+              console.log("🚀 Auto-advancing to next issue:", nextItem.identifier, "isCustom:", nextItem.source === "custom");
+              // Load the next issue (server will send autoAdvance notification to everyone)
+              currentWs.sendIssueConfirm(nextItem.identifier, -1, nextItem.source === "custom");
+              console.log("✅ sendIssueConfirm called");
+            } else {
+              console.log("❌ Auto-advance skipped: queue is empty or queueItems is undefined");
+            }
+          } else {
+            console.log("❌ Auto-advance skipped:", {
+              hasState: !!currentState,
+              isHost: currentState?.isHost,
+              hasWs: !!currentWs
+            });
+          }
+        }, 2000); // Wait 2 seconds to ensure queue sync has updated the state
+        
+        break;
+      }
+
+      case "estimateAssignmentError": {
+        const messageText = typeof message.payload === 'string' ? message.payload : "Failed to assign estimate";
+        toast.error(messageText, {
+          duration: 5000,
+        });
+        break;
+      }
+
+      case "autoAdvance": {
+        const messageText = typeof message.payload === 'string' ? message.payload : "Advancing to next issue in queue...";
+        toast.info(messageText, {
+          duration: 2000,
+        });
+        break;
+      }
+
       default:
         console.log("Unhandled message type:", message.type);
     }
-  }, []);
+  }, [ws]);
 
   const connect = useCallback(
     async (url: string, username: string, isHost: boolean) => {
       const websocket = new PokerWebSocket(url);
 
       await websocket.connect();
+
+      // Set up a promise that resolves on successful join or rejects on error
+      const joinPromise = new Promise<void>((resolve, reject) => {
+        let joinErrorReceived = false;
+
+        const joinMessageHandler = (message: Message) => {
+          if (message.type === "joinError") {
+            joinErrorReceived = true;
+            reject(new Error(message.payload));
+          } else if (!joinErrorReceived) {
+            // Any other message means join was successful
+            // Forward early messages (e.g., currentIssue) to the normal handler
+            // so the UI reflects the current state even before the main handler attaches.
+            try {
+              handleMessage(message);
+            } catch (e) {
+              console.error("Error handling early join message", e);
+            }
+            resolve();
+          }
+        };
+
+        // Temporarily listen for join result
+        const cleanup = websocket.onMessage(joinMessageHandler);
+
+        // Clean up after 5 seconds (timeout)
+        setTimeout(() => {
+          cleanup();
+          if (!joinErrorReceived) {
+            resolve(); // Assume success if no error received
+          }
+        }, 5000);
+      });
+
       websocket.joinSession(username, isHost);
 
+      // Wait for join to complete
+      await joinPromise;
+
+      // Now set up normal message handler
       websocket.onMessage(handleMessage);
 
       // Re-join session when WebSocket reconnects automatically
@@ -263,8 +435,51 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children }) => {
       revealed: false,
       averagePoints: "0",
       roundNumber: 1,
+      queueItems: [],
     });
   }, [ws]);
+
+  const addQueueItem = useCallback(
+    (identifier: string, title: string, description?: string, index?: number) => {
+      if (ws && gameState.isHost) {
+        ws.sendQueueAdd(identifier, title, description, index);
+      }
+    },
+    [ws, gameState.isHost]
+  );
+
+  const updateQueueItem = useCallback(
+    (id: string, identifier?: string, title?: string, description?: string) => {
+      if (ws && gameState.isHost) {
+        ws.sendQueueUpdate(id, identifier, title, description);
+      }
+    },
+    [ws, gameState.isHost]
+  );
+
+  const deleteQueueItem = useCallback(
+    (id: string) => {
+      if (ws && gameState.isHost) {
+        ws.sendQueueDelete(id);
+      }
+    },
+    [ws, gameState.isHost]
+  );
+
+  const reorderQueue = useCallback(
+    (itemIds: string[]) => {
+      if (ws && gameState.isHost) {
+        ws.sendQueueReorder(itemIds);
+      }
+    },
+    [ws, gameState.isHost]
+  );
+
+  const assignEstimate = useCallback(() => {
+    if (ws && gameState.isHost && gameState.revealed && gameState.linearIssue) {
+      ws.sendAssignEstimate();
+    }
+  }, [ws, gameState.isHost, gameState.revealed, gameState.linearIssue]);
 
   const vote = useCallback(
     (points: number) => {
@@ -334,6 +549,11 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children }) => {
     reveal,
     clear,
     confirmIssue,
+    addQueueItem,
+    updateQueueItem,
+    deleteQueueItem,
+    reorderQueue,
+    assignEstimate,
   };
 
   return <PokerContext.Provider value={value}>{children}</PokerContext.Provider>;

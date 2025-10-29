@@ -22,7 +22,7 @@ export const VoteDisplay = () => {
     return (
       <Panel 
         title="VOTES" 
-        className="w-80 min-h-[400px] flex flex-col"
+        className="w-full md:w-80 min-h-[400px] flex flex-col"
         contentClassName="flex flex-col flex-1"
       >
         <div className="text-muted-foreground text-xs font-mono text-center flex-1 flex items-center justify-center">
@@ -35,7 +35,7 @@ export const VoteDisplay = () => {
   return (
     <Panel 
       title="VOTES" 
-      className="w-80 flex flex-col"
+      className="w-full md:w-80 flex flex-col"
       contentClassName="flex flex-col flex-1"
     >
       <div className="space-y-1.5 flex-1 overflow-y-auto">
