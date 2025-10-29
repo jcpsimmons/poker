@@ -41,13 +41,13 @@ func JoinSession(conn *websocket.Conn, username string, isHost bool) {
 
 	byteMessage, err := json.Marshal(joinMsg)
 	if err != nil {
-		log.Fatal("Error marshalling join message:", err)
+		log.Printf("Error marshalling join message: %v", err)
 		return
 	}
 
 	err = conn.WriteMessage(websocket.TextMessage, byteMessage)
 	if err != nil {
-		log.Fatal("Error sending join message:", err)
+		log.Printf("Error sending join message: %v", err)
 		return
 	}
 }
@@ -83,7 +83,7 @@ func UnmarshallRevealMessage(message []byte) types.RevealMessage {
 func MarshallMessage(message interface{}) []byte {
 	byteMessage, err := json.Marshal(message)
 	if err != nil {
-		log.Fatal("write:", err)
+		log.Printf("Error marshalling message: %v", err)
 		return nil
 	}
 	return byteMessage
@@ -98,13 +98,13 @@ func sendMessage(messageType types.MessageType, payload string, c *websocket.Con
 	byteMessage, err := json.Marshal(message)
 
 	if err != nil {
-		log.Fatal("write:", err)
+		log.Printf("Error marshalling message: %v", err)
 		return
 	}
 
 	err = c.WriteMessage(websocket.TextMessage, byteMessage)
 	if err != nil {
-		log.Fatal("write:", err)
+		log.Printf("Error sending message: %v", err)
 		return
 	}
 }
@@ -133,13 +133,13 @@ func SendIssueConfirm(conn *websocket.Conn, identifier string, queueIndex int, i
 
 	byteMessage, err := json.Marshal(confirmMsg)
 	if err != nil {
-		log.Fatal("Error marshalling issue confirm:", err)
+		log.Printf("Error marshalling issue confirm: %v", err)
 		return
 	}
 
 	err = conn.WriteMessage(websocket.TextMessage, byteMessage)
 	if err != nil {
-		log.Fatal("Error sending issue confirm:", err)
+		log.Printf("Error sending issue confirm: %v", err)
 		return
 	}
 }

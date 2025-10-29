@@ -30,7 +30,6 @@ type Client struct {
 // clients stores all active client connections.
 var clients = make(map[*Client]bool)
 var currentIssue string = ""
-var hasHost = false
 
 // Linear integration state
 var linearClient *linear.LinearClient
@@ -137,15 +136,23 @@ func handler(w http.ResponseWriter, r *http.Request) {
 func handleMessages(client *Client) {
 	// Ensure client is removed on disconnect
 	defer func() {
+		log.Printf("[DEFER] handleMessages defer running for client %p (UserID: %s)", client, client.UserID)
 		mutex.Lock()
-		if _, exists := clients[client]; exists {
+		_, wasConnected := clients[client]
+		log.Printf("[DEFER] Client %p wasConnected: %v", client, wasConnected)
+		if wasConnected {
 			delete(clients, client)
-			log.Printf("Client disconnected (defer): %s", client.UserID)
+			log.Printf("[DEFER] Client disconnected (defer): %s", client.UserID)
 		}
 		mutex.Unlock()
 		client.Conn.Close()
-		// Broadcast updated participant count after client is removed
-		broadcastParticipCount(client)
+		// Only broadcast if we actually removed a connected client
+		if wasConnected {
+			log.Printf("[DEFER] Broadcasting participant count update (client %s was connected)", client.UserID)
+			broadcastParticipCount(client)
+		} else {
+			log.Printf("[DEFER] Skipping broadcast - client %p was not in clients map", client)
+		}
 	}()
 
 	for {
@@ -158,6 +165,7 @@ func handleMessages(client *Client) {
 		messageObject := messaging.UnmarshallMessage(message)
 		switch messageObject.Type {
 		case types.Join:
+			log.Printf("[JOIN] Processing join request from client %p (UserID: %s)", client, client.UserID)
 			// Try to parse as new format first (with isHost), fallback to old format
 			var username string
 			var isHost bool
@@ -167,18 +175,44 @@ func handleMessages(client *Client) {
 				// New format with isHost
 				username = joinMsg.Payload.Username
 				isHost = joinMsg.Payload.IsHost
+				log.Printf("[JOIN] Parsed join message - username: %s, isHost: %v", username, isHost)
 			} else {
 				// Old format (just username string)
 				if messageObject.Payload == "" {
-					log.Println("Error joining: no username specified")
+					log.Println("[JOIN] Error joining: no username specified")
 					break
 				}
 				username = messageObject.Payload
 				isHost = false
+				log.Printf("[JOIN] Parsed old format join - username: %s", username)
 			}
 
-			handleJoin(username, client, isHost)
+			// Only proceed if join was successful
+			log.Printf("[JOIN] Calling handleJoin for username: %s, isHost: %v", username, isHost)
+			joinSuccess := handleJoin(username, client, isHost)
+			log.Printf("[JOIN] handleJoin returned: %v", joinSuccess)
+
+			if !joinSuccess {
+				// Join failed (validation error or duplicate username)
+				log.Printf("[JOIN] Join failed, returning from handleMessages goroutine. Client: %p", client)
+				// Client has been notified and connection closed
+				// Return immediately to exit the goroutine and prevent defer cleanup from running
+				return
+			}
+
+			// Double-check client is still in map and connection is valid before proceeding
+			mutex.Lock()
+			_, stillConnected := clients[client]
+			mutex.Unlock()
+			if !stillConnected {
+				log.Printf("[JOIN] WARNING: Client %s not in clients map after successful join! Returning immediately.", username)
+				return
+			}
+
+			log.Printf("[JOIN] Join successful, proceeding with post-join setup for %s", username)
+
 			// send cur issue (with linearIssue if applicable)
+			log.Printf("[JOIN] Sending current issue to %s", username)
 			var currentIssuePayload types.CurrentIssuePayload
 			currentIssuePayload.Text = currentIssue
 			if currentLinearIssue != nil {
@@ -201,17 +235,24 @@ func handleMessages(client *Client) {
 				sendClientMessage(client, curIssueMessage)
 			}
 
+			log.Printf("[JOIN] Calculating point average for %s", username)
 			pointAvgStr := strconv.FormatInt(int64(getPointAverage()), 10)
+			log.Printf("[JOIN] Point average calculated: %s", pointAvgStr)
 			estimateMessage := types.Message{
 				Type:    types.CurrentEstimate,
 				Payload: pointAvgStr,
 			}
 			sendClientMessage(client, estimateMessage)
+			log.Printf("[JOIN] Sent estimate message to %s", username)
 
+			log.Printf("[JOIN] Broadcasting participant count")
 			broadcastParticipCount(client)
+			log.Printf("[JOIN] Broadcasting vote status")
 			broadcastVoteStatus(client)
 			// Send queue sync to newly joined client
+			log.Printf("[JOIN] Broadcasting queue sync")
 			broadcastQueueSync()
+			log.Printf("[JOIN] Complete - all post-join messages sent to %s", username)
 		case types.NewIssue:
 			// If we have Linear issues queued, use next from queue
 			if linearClient != nil && currentIssueIndex >= 0 && currentIssueIndex < len(linearIssues) {
@@ -374,37 +415,91 @@ func isUsernameTaken(username string) bool {
 	return false
 }
 
-func handleJoin(username string, sender *Client, isHost bool) {
+// hasHost checks if there's already a host in the session
+func hasHost() bool {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	for client := range clients {
+		if client.IsHost {
+			return true
+		}
+	}
+	return false
+}
+
+func handleJoin(username string, sender *Client, isHost bool) bool {
+	log.Printf("[handleJoin] START - username: %s, isHost: %v, client: %p, current UserID: %s", username, isHost, sender, sender.UserID)
+
 	// Validate username
 	validUsername, err := validateUsername(username)
 	if err != nil {
-		log.Printf("Invalid username attempt: %s - %v", username, err)
+		log.Printf("[handleJoin] VALIDATION FAILED - username: %s - %v", username, err)
 		// Send error message to client
 		errorMsg := types.Message{
 			Type:    types.JoinError,
 			Payload: err.Error(),
 		}
 		byteMessage := messaging.MarshallMessage(errorMsg)
-		sender.Conn.WriteMessage(websocket.TextMessage, byteMessage)
+		if writeErr := sender.Conn.WriteMessage(websocket.TextMessage, byteMessage); writeErr != nil {
+			log.Printf("[handleJoin] Error writing validation error: %v", writeErr)
+		}
 		// Close connection
 		sender.Conn.Close()
+		log.Printf("[handleJoin] Closed connection after validation failure")
+		// Remove from clients map with mutex protection
+		mutex.Lock()
+		_, existed := clients[sender]
 		delete(clients, sender)
-		return
+		mutex.Unlock()
+		log.Printf("[handleJoin] Removed from clients map (existed: %v), returning false", existed)
+		return false
 	}
 
 	// Check for duplicate username (case-insensitive)
 	if isUsernameTaken(validUsername) {
-		log.Printf("Duplicate username attempt: %s", validUsername)
+		log.Printf("[handleJoin] DUPLICATE USERNAME - username: %s", validUsername)
 		errorMsg := types.Message{
 			Type:    types.JoinError,
 			Payload: "username is already taken, please choose another",
 		}
 		byteMessage := messaging.MarshallMessage(errorMsg)
-		sender.Conn.WriteMessage(websocket.TextMessage, byteMessage)
+		if writeErr := sender.Conn.WriteMessage(websocket.TextMessage, byteMessage); writeErr != nil {
+			log.Printf("[handleJoin] Error writing duplicate error: %v", writeErr)
+		}
 		// Close connection
 		sender.Conn.Close()
+		log.Printf("[handleJoin] Closed connection after duplicate username")
+		// Remove from clients map with mutex protection
+		mutex.Lock()
+		_, existed := clients[sender]
 		delete(clients, sender)
-		return
+		mutex.Unlock()
+		log.Printf("[handleJoin] Removed from clients map (existed: %v), returning false", existed)
+		return false
+	}
+
+	// Check if trying to join as host when there's already a host
+	if isHost && hasHost() {
+		log.Printf("[handleJoin] MULTIPLE HOST - username: %s tried to join as host", validUsername)
+		errorMsg := types.Message{
+			Type:    types.JoinError,
+			Payload: "a host is already in this session, please join as a player",
+		}
+		byteMessage := messaging.MarshallMessage(errorMsg)
+		if writeErr := sender.Conn.WriteMessage(websocket.TextMessage, byteMessage); writeErr != nil {
+			log.Printf("[handleJoin] Error writing multiple host error: %v", writeErr)
+		}
+		// Close connection
+		sender.Conn.Close()
+		log.Printf("[handleJoin] Closed connection after multiple host")
+		// Remove from clients map with mutex protection
+		mutex.Lock()
+		_, existed := clients[sender]
+		delete(clients, sender)
+		mutex.Unlock()
+		log.Printf("[handleJoin] Removed from clients map (existed: %v), returning false", existed)
+		return false
 	}
 
 	sender.UserID = validUsername
@@ -467,7 +562,7 @@ func handleJoin(username string, sender *Client, isHost bool) {
 				broadcastQueueSync()
 
 				log.Printf("Auto-loaded first Linear issue: %s", linearIssue.Identifier)
-				return
+				return true
 			}
 		}
 	}
@@ -476,6 +571,8 @@ func handleJoin(username string, sender *Client, isHost bool) {
 	if isHost && linearClient != nil && pendingQueueIndex >= 0 && pendingQueueIndex < len(linearIssues) {
 		suggestIssueToHost(sender)
 	}
+
+	return true
 }
 
 func getFormattedRevealData() []types.UserEstimate {
@@ -602,23 +699,51 @@ func countVoted(voters []types.VoterInfo) int {
 func sendClientMessage(client *Client, message types.Message) {
 	byteMessage := messaging.MarshallMessage(message)
 	if err := client.Conn.WriteMessage(websocket.TextMessage, byteMessage); err != nil {
-		log.Fatal("Error writing message:", err)
+		log.Printf("Error writing message to client %s: %v", client.UserID, err)
+		// Don't crash the server, just log the error
+		// The client will be cleaned up by the read loop when it detects the broken connection
 	}
 }
 
 // broadcast sends a message to all clients except the sender.
 func broadcast(message []byte, sender *Client) {
+	// Step 1: Copy client list while holding the lock (don't do network I/O under lock)
 	mutex.Lock()
-	log.Println("Broadcasting message: ", string(message))
-
+	clientList := make([]*Client, 0, len(clients))
 	for client := range clients {
-		log.Println("broadcast to client: ", client.UserID)
-		if err := client.Conn.WriteMessage(websocket.TextMessage, message); err != nil {
-			log.Fatal("Error writing message:", err)
-			break
-		}
+		clientList = append(clientList, client)
 	}
 	mutex.Unlock()
+
+	log.Println("Broadcasting message: ", string(message))
+
+	// Step 2: Send to all clients without holding the lock
+	var deadClients []*Client
+	for _, client := range clientList {
+		log.Println("broadcast to client: ", client.UserID)
+		if err := client.Conn.WriteMessage(websocket.TextMessage, message); err != nil {
+			log.Printf("Error writing message to client %s: %v (marking for cleanup)", client.UserID, err)
+			deadClients = append(deadClients, client)
+		}
+	}
+
+	// Step 3: Clean up dead connections
+	if len(deadClients) > 0 {
+		mutex.Lock()
+		for _, client := range deadClients {
+			if _, exists := clients[client]; exists {
+				delete(clients, client)
+				client.Conn.Close()
+				log.Printf("Removed dead client: %s", client.UserID)
+			}
+		}
+		participantCount := len(clients)
+		mutex.Unlock()
+
+		// Notify remaining clients about updated participant count
+		log.Printf("Cleaned up %d dead clients, %d remaining", len(deadClients), participantCount)
+		go broadcastParticipCount(nil)
+	}
 }
 
 // pushVotingResultsToLinear posts voting results as a comment to the Linear issue

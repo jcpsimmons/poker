@@ -17,6 +17,17 @@ function App() {
     setJoined(false);
   };
 
+  const handleAutoReconnectFailed = (error: string) => {
+    console.error("Auto-reconnect failed:", error);
+    // Set joined to false to show join page
+    setJoined(false);
+    // Show error toast notification
+    toast.error("Cannot rejoin session", {
+      description: error,
+      duration: 5000,
+    });
+  };
+
   // Show welcome message on initial load
   useEffect(() => {
     if (!hasShownWelcome.current) {
@@ -28,20 +39,12 @@ function App() {
     }
   }, []);
 
-  // Listen for storage events to sync tabs
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'poker_active_session') {
-        setJoined(e.newValue === 'true');
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+  // Note: Removed cross-tab sync via storage events
+  // Each tab manages its own session independently to prevent
+  // one tab's failed reconnect from kicking out other tabs
 
   return (
-    <PokerProvider>
+    <PokerProvider onAutoReconnectFailed={handleAutoReconnectFailed}>
       {!joined ? (
         <JoinPage onJoin={() => setJoined(true)} />
       ) : (

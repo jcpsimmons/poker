@@ -35,13 +35,15 @@ export const usePoker = () => {
 
 interface PokerProviderProps {
   children: React.ReactNode;
+  onAutoReconnectFailed?: (error: string) => void;
 }
 
-export const PokerProvider: React.FC<PokerProviderProps> = ({ children }) => {
+export const PokerProvider: React.FC<PokerProviderProps> = ({ children, onAutoReconnectFailed }) => {
   const [ws, setWs] = useState<PokerWebSocket | null>(null);
   // Use refs to access latest state and ws in setTimeout callbacks
   const gameStateRef = useRef<GameState | null>(null);
   const wsRef = useRef<PokerWebSocket | null>(null);
+  const reconnectAttempted = useRef(false); // Prevent multiple reconnect attempts
   const [gameState, setGameState] = useState<GameState>(() => {
     // Restore state from localStorage if available
     const hasActiveSession = localStorage.getItem('poker_active_session') === 'true';
@@ -217,8 +219,11 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children }) => {
       setWs(null);
     }
     
-    // Clear active session flag
+    // Clear all localStorage keys related to poker session
     localStorage.removeItem('poker_active_session');
+    localStorage.removeItem('poker_username');
+    localStorage.removeItem('poker_server_url');
+    localStorage.removeItem('poker_is_host');
     
     // Reset game state to initial
     setGameState({
@@ -316,6 +321,12 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children }) => {
 
   // Auto-reconnect on mount if there's an active session
   useEffect(() => {
+    // Prevent multiple reconnect attempts (React Strict Mode can cause double renders)
+    if (reconnectAttempted.current) {
+      console.log("Reconnect already attempted, skipping");
+      return;
+    }
+    
     const hasActiveSession = localStorage.getItem('poker_active_session') === 'true';
     const savedUsername = localStorage.getItem('poker_username');
     const savedServerUrl = localStorage.getItem('poker_server_url');
@@ -323,10 +334,21 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children }) => {
 
     if (hasActiveSession && savedUsername && savedServerUrl && !ws) {
       console.log("Attempting to reconnect to previous session...");
+      reconnectAttempted.current = true;
+      
       connect(savedServerUrl, savedUsername, savedIsHost).catch((error) => {
         console.error("Failed to reconnect:", error);
-        // Clear session if reconnection fails
+        
+        // Don't clear localStorage here - it would trigger storage events in other tabs
+        // and kick them out too! Just clear the active session flag.
         localStorage.removeItem('poker_active_session');
+        // Keep username/url/host in localStorage so user can retry with different name
+        
+        // Notify parent component about the failure
+        if (onAutoReconnectFailed) {
+          const errorMessage = error instanceof Error ? error.message : "Failed to reconnect to session";
+          onAutoReconnectFailed(errorMessage);
+        }
       });
     }
     // Only run on mount - don't include connect/ws in deps to avoid re-running

@@ -25,12 +25,16 @@ export class PokerWebSocket {
   private shouldReconnect = true;
   private pendingReconnect: number | null = null;
   private isReconnecting = false;
+  private joinErrorReceived = false; // Flag to prevent reconnection after join error
 
   constructor(url: string) {
     this.url = url;
   }
 
   connect(): Promise<void> {
+    // Reset joinError flag for new connection attempt
+    this.joinErrorReceived = false;
+    
     // Clear any pending reconnect attempts
     if (this.pendingReconnect) {
       clearTimeout(this.pendingReconnect);
@@ -75,6 +79,12 @@ export class PokerWebSocket {
         this.ws.onmessage = (event) => {
           try {
             const message: Message = JSON.parse(event.data);
+            // Check for joinError and disable reconnection
+            if (message.type === 'joinError') {
+              console.log("Join error received, disabling auto-reconnect");
+              this.joinErrorReceived = true;
+              this.shouldReconnect = false;
+            }
             this.messageHandlers.forEach((handler) => handler(message));
           } catch (error) {
             console.error("Error parsing message:", error);
@@ -94,6 +104,12 @@ export class PokerWebSocket {
           // Always notify disconnect handlers immediately on close
           // The UI should reflect the actual connection state
           this.disconnectHandlers.forEach((handler) => handler());
+          
+          // Never reconnect if we received a joinError
+          if (this.joinErrorReceived) {
+            console.log("Not reconnecting - joinError was received");
+            return;
+          }
           
           // Check if we should auto-reconnect for unexpected closures (not normal closures)
           const shouldAttemptReconnect = this.shouldReconnect && 
