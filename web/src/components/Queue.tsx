@@ -3,6 +3,8 @@ import { Panel } from "./layout/Panel";
 import { GripVertical, Edit2, Trash2, Plus } from "lucide-react";
 import { useState } from "react";
 import { QueueItemModal } from "./modals/QueueItemModal";
+import { Button } from "./ui/Button";
+import { Badge } from "./ui/Badge";
 
 export const Queue = () => {
   const { gameState, deleteQueueItem, reorderQueue, confirmIssue } = usePoker();
@@ -86,14 +88,14 @@ export const Queue = () => {
                           {item.identifier}
                         </span>
                         {item.source === "linear" && (
-                          <span className="text-[10px] font-mono bg-primary/20 text-primary px-1 py-0.5 rounded">
+                          <Badge variant="info" className="text-[10px]">
                             LINEAR
-                          </span>
+                          </Badge>
                         )}
                         {isCurrent && (
-                          <span className="text-[10px] font-mono bg-primary text-background px-1 py-0.5 rounded">
+                          <Badge variant="primary" className="text-[10px]">
                             CURRENT
-                          </span>
+                          </Badge>
                         )}
                       </div>
                       <div className="text-xs font-mono text-muted-foreground truncate">
@@ -102,13 +104,14 @@ export const Queue = () => {
                     </div>
                     {isHost && (
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
+                        <Button
                           onClick={() => handleLoadIssue(item)}
-                          className="text-xs font-mono bg-foreground hover:bg-foreground/90 text-background px-2 py-1 rounded transition-colors cursor-pointer"
+                          variant="primary"
+                          size="sm"
                           title="Load this issue"
                         >
                           LOAD
-                        </button>
+                        </Button>
                         <button
                           onClick={() => setEditingItem(item.id)}
                           className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
@@ -131,13 +134,13 @@ export const Queue = () => {
             )}
           </div>
           {isHost && (
-            <button
+            <Button
               onClick={() => setShowAddModal(true)}
-              className="w-full flex items-center justify-center gap-2 p-2 border border-border/50 rounded text-xs font-mono text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer flex-shrink-0"
+              icon={Plus}
+              className="w-full flex-shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted/50"
             >
-              <Plus className="w-3 h-3" />
               ADD TO QUEUE
-            </button>
+            </Button>
           )}
         </div>
       </Panel>

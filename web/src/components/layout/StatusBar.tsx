@@ -8,12 +8,10 @@ export const StatusBar = () => {
   const [showHelp, setShowHelp] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
 
-  // Get unique usernames from votes, and include current user
-  const participantSet = new Set(gameState.votes.map(v => v.username));
-  if (gameState.username) {
-    participantSet.add(gameState.username);
-  }
-  const participants = Array.from(participantSet).sort();
+  // Get all participants from voters array (includes everyone, voted or not)
+  const participants = gameState.voters
+    .map(v => v.username)
+    .sort();
 
   return (
     <>

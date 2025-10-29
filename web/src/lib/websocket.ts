@@ -11,12 +11,14 @@ import {
 
 export type MessageHandler = (message: Message) => void;
 export type ReconnectHandler = () => void;
+export type DisconnectHandler = () => void;
 
 export class PokerWebSocket {
   private ws: WebSocket | null = null;
   private url: string;
   private messageHandlers: Set<MessageHandler> = new Set();
   private reconnectHandlers: Set<ReconnectHandler> = new Set();
+  private disconnectHandlers: Set<DisconnectHandler> = new Set();
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 2000;
@@ -58,6 +60,8 @@ export class PokerWebSocket {
           console.log("WebSocket connected");
           clearTimeout(connectionTimeout);
           
+          this.reconnectAttempts = 0;
+          
           // Notify reconnect handlers if this was a reconnection
           if (this.isReconnecting) {
             console.log("Notifying reconnect handlers...");
@@ -65,7 +69,6 @@ export class PokerWebSocket {
             this.isReconnecting = false;
           }
           
-          this.reconnectAttempts = 0;
           resolve();
         };
 
@@ -88,10 +91,16 @@ export class PokerWebSocket {
           console.log("WebSocket closed", event.code, event.reason);
           clearTimeout(connectionTimeout);
           
-          // Only auto-reconnect for unexpected closures (not normal closures)
-          if (this.shouldReconnect && 
+          // Always notify disconnect handlers immediately on close
+          // The UI should reflect the actual connection state
+          this.disconnectHandlers.forEach((handler) => handler());
+          
+          // Check if we should auto-reconnect for unexpected closures (not normal closures)
+          const shouldAttemptReconnect = this.shouldReconnect && 
               this.reconnectAttempts < this.maxReconnectAttempts &&
-              event.code !== 1000) { // 1000 is normal closure
+              event.code !== 1000; // 1000 is normal closure
+          
+          if (shouldAttemptReconnect) {
             this.isReconnecting = true;
             this.pendingReconnect = setTimeout(() => {
               this.reconnectAttempts++;
@@ -136,6 +145,13 @@ export class PokerWebSocket {
     this.reconnectHandlers.add(handler);
     return () => {
       this.reconnectHandlers.delete(handler);
+    };
+  }
+
+  onDisconnect(handler: DisconnectHandler) {
+    this.disconnectHandlers.add(handler);
+    return () => {
+      this.disconnectHandlers.delete(handler);
     };
   }
 

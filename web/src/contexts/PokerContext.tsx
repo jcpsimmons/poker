@@ -1,17 +1,10 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
-import { toast } from "sonner";
 import { PokerWebSocket } from "../lib/websocket";
 import type {
   GameState,
   Message,
-  MessageType,
-  RevealPayload,
-  IssueSuggestedPayload,
-  IssueLoadedPayload,
-  CurrentIssuePayload,
-  VoteStatusPayload,
-  QueueSyncPayload,
 } from "../types/poker";
+import { messageHandlers } from "../lib/messageHandlers";
 
 interface PokerContextType {
   gameState: GameState;
@@ -63,6 +56,7 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children }) => {
         currentIssueId: "",
         participants: 0,
         votes: [],
+        voters: [],
         revealed: false,
         averagePoints: "0",
         roundNumber: 1,
@@ -77,6 +71,7 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children }) => {
       currentIssueId: "",
       participants: 0,
       votes: [],
+      voters: [],
       revealed: false,
       averagePoints: "0",
       roundNumber: 1,
@@ -94,255 +89,67 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children }) => {
   }, [ws]);
 
   const handleMessage = useCallback((message: Message) => {
-    console.log("Received message:", message);
-
-    switch (message.type as MessageType) {
-      case "currentIssue": {
-        try {
-          const payload: CurrentIssuePayload = typeof message.payload === 'string'
-            ? JSON.parse(message.payload)
-            : message.payload;
-          setGameState((prev) => ({
-            ...prev,
-            currentIssue: payload.text,
-            // Use linearIssue from payload if provided, otherwise preserve existing
-            linearIssue: payload.linearIssue ?? prev.linearIssue,
-            revealed: false,
-            votes: [],
-            myVote: undefined,
-            roundNumber: prev.roundNumber + 1,
-          }));
-        } catch {
-          // Fallback for simple string payload - preserve existing linearIssue
-          setGameState((prev) => ({
-            ...prev,
-            currentIssue: message.payload,
-            // Don't clear linearIssue for simple string payloads if we already have one
-            // linearIssue stays as-is (prev.linearIssue)
-            revealed: false,
-            votes: [],
-            myVote: undefined,
-            roundNumber: prev.roundNumber + 1,
-          }));
-        }
-        break;
-      }
-
-      case "participantCount": {
-        const count = parseInt(message.payload);
-        setGameState((prev) => ({ ...prev, participants: count }));
-        break;
-      }
-
-      case "currentEstimate": {
-        // Individual vote update (not used in current UI but kept for compatibility)
-        break;
-      }
-
-      case "revealData": {
-        const payload: RevealPayload = typeof message.payload === 'string' 
-          ? JSON.parse(message.payload)
-          : message.payload;
-        setGameState((prev) => ({
-          ...prev,
-          revealed: true,
-          averagePoints: payload.pointAvg,
-          votes: payload.estimates.map((est) => ({
-            username: est.user,
-            points: est.estimate,
-            revealed: true,
-          })),
-        }));
-        break;
-      }
-
-      case "clearBoard": {
-        setGameState((prev) => ({
-          ...prev,
-          revealed: false,
-          votes: [],
-          myVote: undefined,
-        }));
-        break;
-      }
-
-      case "issueSuggested": {
-        const payload: IssueSuggestedPayload = typeof message.payload === 'string'
-          ? JSON.parse(message.payload)
-          : message.payload;
-        setGameState((prev) => ({
-          ...prev,
-          pendingIssue: payload,
-        }));
-        break;
-      }
-
-      case "issueLoaded": {
-        const payload: IssueLoadedPayload = typeof message.payload === 'string'
-          ? JSON.parse(message.payload)
-          : message.payload;
-        setGameState((prev) => {
-          // Try to find Linear issue data from queue items
-          let linearIssue = prev.linearIssue;
-          
-          // Check if this is in the queue as a Linear item
-          const queueItem = prev.queueItems.find(item => 
-            item.identifier === payload.identifier && item.source === "linear"
-          );
-          
-          if (queueItem && queueItem.linearId) {
-            linearIssue = {
-              id: queueItem.linearId,
-              identifier: queueItem.identifier,
-              title: queueItem.title,
-              description: queueItem.description || "",
-              url: queueItem.url || "",
-            };
-          } else if (prev.pendingIssue && prev.pendingIssue.identifier === payload.identifier && prev.pendingIssue.source === "linear") {
-            // Fallback to pendingIssue data
-            linearIssue = {
-              id: prev.pendingIssue.identifier, // Will be updated by currentIssue message if available
-              identifier: prev.pendingIssue.identifier,
-              title: prev.pendingIssue.title,
-              description: prev.pendingIssue.description || "",
-              url: prev.pendingIssue.url || "",
-            };
-          } else if (prev.linearIssue && prev.linearIssue.identifier === payload.identifier) {
-            // Keep existing linearIssue if it matches
-            linearIssue = prev.linearIssue;
-          }
-          
-          return {
-            ...prev,
-            currentIssue: payload.title,
-            currentIssueId: payload.identifier,
-            pendingIssue: undefined,
-            linearIssue: linearIssue,
-          };
-        });
-        break;
-      }
-
-      case "issueStale": {
-        console.warn("Issue queue changed, refresh needed");
-        break;
-      }
-
-      case "voteStatus": {
-        const payload: VoteStatusPayload = typeof message.payload === 'string'
-          ? JSON.parse(message.payload)
-          : message.payload;
-        
-        console.log("Vote status update:", payload);
-        
-        // Update votes array from server's source of truth
-        setGameState((prev) => {
-          const votes = payload.voters
-            .filter(voter => voter.hasVoted)
-            .map(voter => ({
-              username: voter.username,
-              points: "", // Don't show points until reveal
-              revealed: false,
-            }));
-          
-          console.log(`Updating votes: ${votes.length} voted out of ${payload.voters.length} total`);
-          
-          return {
-            ...prev,
-            votes,
-          };
-        });
-        break;
-      }
-
-      case "joinError": {
-        // This will be handled by the connect function's error handler
-        console.error("Join error from server:", message.payload);
-        break;
-      }
-
-      case "queueSync": {
-        const payload: QueueSyncPayload = typeof message.payload === 'string'
-          ? JSON.parse(message.payload)
-          : message.payload;
-        setGameState((prev) => ({
-          ...prev,
-          queueItems: payload.items || [],
-        }));
-        break;
-      }
-
-      case "estimateAssignmentSuccess": {
-        console.log("✅ estimateAssignmentSuccess received, starting auto-advance logic");
-        const messageText = typeof message.payload === 'string' ? message.payload : "Estimate assigned successfully";
-        toast.success(messageText, {
-          duration: 3000,
-        });
-
-        // Auto-advance to next issue in queue (if host and queue has items)
-        // Wait a moment for state to update (queue sync after assignment), then advance
-        // Server will broadcast autoAdvance message to everyone when issue loads
-        setTimeout(() => {
-          console.log("⏰ Auto-advance timeout fired, checking state...");
-          // Use refs to get latest state and ws
-          const currentState = gameStateRef.current;
-          const currentWs = wsRef.current;
-          console.log("📊 Current state:", {
-            isHost: currentState?.isHost,
-            hasWs: !!currentWs,
-            queueLength: currentState?.queueItems?.length,
-            queueItems: currentState?.queueItems?.map(i => i.identifier)
-          });
-          
-          if (currentState && currentState.isHost && currentWs) {
-            // Get the first item from the queue (current issue should already be removed)
-            if (currentState.queueItems && currentState.queueItems.length > 0) {
-              const nextItem = currentState.queueItems[0];
-              console.log("🚀 Auto-advancing to next issue:", nextItem.identifier, "isCustom:", nextItem.source === "custom");
-              // Load the next issue (server will send autoAdvance notification to everyone)
-              currentWs.sendIssueConfirm(nextItem.identifier, -1, nextItem.source === "custom");
-              console.log("✅ sendIssueConfirm called");
-            } else {
-              console.log("❌ Auto-advance skipped: queue is empty or queueItems is undefined");
-            }
-          } else {
-            console.log("❌ Auto-advance skipped:", {
-              hasState: !!currentState,
-              isHost: currentState?.isHost,
-              hasWs: !!currentWs
-            });
-          }
-        }, 2000); // Wait 2 seconds to ensure queue sync has updated the state
-        
-        break;
-      }
-
-      case "estimateAssignmentError": {
-        const messageText = typeof message.payload === 'string' ? message.payload : "Failed to assign estimate";
-        toast.error(messageText, {
-          duration: 5000,
-        });
-        break;
-      }
-
-      case "autoAdvance": {
-        const messageText = typeof message.payload === 'string' ? message.payload : "Advancing to next issue in queue...";
-        toast.info(messageText, {
-          duration: 2000,
-        });
-        break;
-      }
-
-      default:
-        console.log("Unhandled message type:", message.type);
+    const isDev = import.meta.env.DEV;
+    
+    if (isDev) {
+      console.log("Received message:", message);
     }
-  }, [ws]);
+
+    // Find handler for this message type
+    const handler = messageHandlers[message.type];
+
+    if (!handler) {
+      console.log("Unhandled message type:", message.type);
+      return;
+    }
+
+    try {
+      // Call handler with payload and current state, passing refs for async operations
+      const stateUpdate = handler(message.payload, gameState, {
+        wsRef,
+        gameStateRef,
+      });
+
+      // If handler returned a state update, merge it with current state
+      if (stateUpdate) {
+        setGameState((prev) => ({ ...prev, ...stateUpdate }));
+
+        if (isDev) {
+          console.log(`[${message.type}] State update:`, stateUpdate);
+        }
+      }
+    } catch (error) {
+      console.error(`Error handling message type ${message.type}:`, error);
+    }
+  }, [gameState, wsRef, gameStateRef]);
 
   const connect = useCallback(
     async (url: string, username: string, isHost: boolean) => {
       const websocket = new PokerWebSocket(url);
 
       await websocket.connect();
+
+      // Set connected state immediately after WebSocket opens
+      setWs(websocket);
+      setGameState((prev) => ({
+        ...prev,
+        connected: true,
+        username,
+        isHost,
+      }));
+
+      // Update UI when connection drops
+      websocket.onDisconnect(() => {
+        console.log("WebSocket disconnected, updating UI...");
+        setGameState((prev) => ({ ...prev, connected: false }));
+      });
+
+      // Re-join session when WebSocket reconnects automatically
+      websocket.onReconnect(() => {
+        console.log("WebSocket reconnected, re-joining session...");
+        websocket.joinSession(username, isHost);
+        setGameState((prev) => ({ ...prev, connected: true }));
+      });
 
       // Set up a promise that resolves on successful join or rejects on error
       const joinPromise = new Promise<void>((resolve, reject) => {
@@ -351,6 +158,10 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children }) => {
         const joinMessageHandler = (message: Message) => {
           if (message.type === "joinError") {
             joinErrorReceived = true;
+            // Disconnect and clean up on join error
+            websocket.disconnect();
+            setWs(null);
+            setGameState((prev) => ({ ...prev, connected: false }));
             reject(new Error(message.payload));
           } else if (!joinErrorReceived) {
             // Any other message means join was successful
@@ -385,22 +196,8 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children }) => {
       // Now set up normal message handler
       websocket.onMessage(handleMessage);
 
-      // Re-join session when WebSocket reconnects automatically
-      websocket.onReconnect(() => {
-        console.log("WebSocket reconnected, re-joining session...");
-        websocket.joinSession(username, isHost);
-      });
-
       // Save active session to localStorage
       localStorage.setItem('poker_active_session', 'true');
-
-      setWs(websocket);
-      setGameState((prev) => ({
-        ...prev,
-        connected: true,
-        username,
-        isHost,
-      }));
     },
     [handleMessage]
   );
@@ -432,6 +229,7 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children }) => {
       currentIssueId: "",
       participants: 0,
       votes: [],
+      voters: [],
       revealed: false,
       averagePoints: "0",
       roundNumber: 1,
@@ -531,13 +329,36 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children }) => {
         localStorage.removeItem('poker_active_session');
       });
     }
-  }, [connect, ws]);
+    // Only run on mount - don't include connect/ws in deps to avoid re-running
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // Sync connected state with actual WebSocket connection
   useEffect(() => {
+    if (!ws) return;
+
+    // Periodically check if the actual connection state matches our state
+    const checkConnection = setInterval(() => {
+      const actuallyConnected = ws.isConnected();
+      if (actuallyConnected !== gameState.connected) {
+        console.log(`Connection state mismatch! Actual: ${actuallyConnected}, State: ${gameState.connected}`);
+        setGameState((prev) => ({ ...prev, connected: actuallyConnected }));
+      }
+    }, 1000);
+
+    return () => clearInterval(checkConnection);
+  }, [ws, gameState.connected]);
+
+  // Cleanup when ws changes or on unmount
+  useEffect(() => {
+    // Return cleanup function that closes the current ws instance
+    const currentWs = ws;
     return () => {
-      disconnect();
+      if (currentWs) {
+        currentWs.disconnect();
+      }
     };
-  }, [disconnect]);
+  }, [ws]);
 
   const value: PokerContextType = {
     gameState,

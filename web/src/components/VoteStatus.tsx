@@ -22,9 +22,10 @@ export const VoteStatus = () => {
   return (
     <Panel 
       title="STATUS" 
-      className="w-full h-full"
+      className="w-full h-full flex flex-col"
+      contentClassName="flex-1 flex items-center justify-center p-0"
     >
-      <div className="flex flex-col items-center justify-center w-full h-full gap-1">
+      <div className="flex flex-col items-center justify-center gap-1">
         <div className={`font-mono text-xs ${getTextColor()}`}>
           {votedCount}/{totalCount}
         </div>

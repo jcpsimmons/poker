@@ -1,6 +1,7 @@
 import { usePoker } from "../contexts/PokerContext";
 import { cn } from "../lib/utils";
 import { Panel } from "./layout/Panel";
+import { Badge } from "./ui/Badge";
 
 export const VoteDisplay = () => {
   const { gameState } = usePoker();
@@ -72,10 +73,10 @@ export const VoteDisplay = () => {
       </div>
 
       {gameState.revealed && gameState.averagePoints !== "0" && (
-        <div className="mt-2 p-2 bg-green-500/10 border border-green-500/20 rounded">
-          <div className="text-green-500 text-xs font-mono">
+        <div className="mt-2 p-2">
+          <Badge variant="success" className="w-full text-center block">
             AVG: {gameState.averagePoints}
-          </div>
+          </Badge>
         </div>
       )}
     </Panel>

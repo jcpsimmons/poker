@@ -1,5 +1,6 @@
-import { X } from "lucide-react";
 import { usePoker } from "../../contexts/PokerContext";
+import { Modal } from "../ui/Modal";
+import { Button } from "../ui/Button";
 
 interface StatsModalProps {
   isOpen: boolean;
@@ -9,29 +10,13 @@ interface StatsModalProps {
 export const StatsModal = ({ isOpen, onClose }: StatsModalProps) => {
   const { gameState } = usePoker();
 
-  if (!isOpen) return null;
-
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="STATISTICS"
+      containerClassName="max-w-lg"
     >
-      <div className="bg-card border border-border/50 rounded p-6 max-w-lg w-full mx-4">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-medium text-foreground font-mono uppercase tracking-wider">
-            STATISTICS
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
 
         <div className="space-y-4 text-foreground">
           <div className="flex justify-between items-center py-2 border-b border-border/50">
@@ -69,16 +54,16 @@ export const StatsModal = ({ isOpen, onClose }: StatsModalProps) => {
           </div>
         </div>
 
-        <div className="mt-6">
-          <button
-            onClick={onClose}
-            className="w-full bg-foreground hover:bg-foreground/90 text-background font-mono text-xs py-2 px-4 rounded transition-all cursor-pointer"
-          >
-            CLOSE
-          </button>
-        </div>
+      <div className="mt-6">
+        <Button
+          onClick={onClose}
+          variant="primary"
+          className="w-full"
+        >
+          CLOSE
+        </Button>
       </div>
-    </div>
+    </Modal>
   );
 };
 

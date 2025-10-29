@@ -2,6 +2,7 @@ import { usePoker } from "../contexts/PokerContext";
 import { ESTIMATE_OPTIONS } from "../types/poker";
 import { cn } from "../lib/utils";
 import { Panel } from "./layout/Panel";
+import { Badge } from "./ui/Badge";
 
 export const EstimateSelector = () => {
   const { gameState, vote } = usePoker();
@@ -38,10 +39,10 @@ export const EstimateSelector = () => {
       </div>
 
       {gameState.myVote !== undefined && (
-        <div className="mt-2 p-2 bg-green-500/10 border border-green-500/20 rounded">
-          <div className="text-green-500 text-xs font-mono">
+        <div className="mt-2 p-2">
+          <Badge variant="success" className="w-full text-center block">
             VOTED: {gameState.myVote}
-          </div>
+          </Badge>
         </div>
       )}
     </Panel>

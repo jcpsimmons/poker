@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { usePoker } from "../contexts/PokerContext";
 import { User, Server, Crown, AlertCircle } from "lucide-react";
+import { Input } from "../components/ui/Input";
 
 interface JoinPageProps {
   onJoin: () => void;
@@ -140,16 +141,13 @@ export const JoinPage = ({ onJoin }: JoinPageProps) => {
                 <User className="w-3 h-3" />
                 USER
               </label>
-              <input
+              <Input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter your name"
-                className={`w-full bg-background border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 text-foreground font-mono ${
-                  usernameError 
-                    ? "border-destructive focus:ring-destructive/20" 
-                    : "border-border/50 focus:ring-foreground/20"
-                }`}
+                error={!!usernameError}
+                className="px-2 py-1.5"
                 onKeyDown={(e) => e.key === "Enter" && handleConnect()}
               />
               {usernameError && (
@@ -165,12 +163,12 @@ export const JoinPage = ({ onJoin }: JoinPageProps) => {
                 <Server className="w-3 h-3" />
                 SERVER
               </label>
-              <input
+              <Input
                 type="text"
                 value={serverUrl}
                 onChange={(e) => setServerUrl(e.target.value)}
                 placeholder="ws://localhost:9867/ws"
-                className="w-full bg-background border border-border/50 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20 text-foreground font-mono"
+                className="px-2 py-1.5"
                 onKeyDown={(e) => e.key === "Enter" && handleConnect()}
               />
             </div>

@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { X } from "lucide-react";
 import { usePoker } from "../../contexts/PokerContext";
+import { Modal } from "../ui/Modal";
+import { Input } from "../ui/Input";
+import { Button } from "../ui/Button";
 
 interface IssuePickerModalProps {
   isOpen: boolean;
@@ -11,8 +13,6 @@ export const IssuePickerModal = ({ isOpen, onClose }: IssuePickerModalProps) => 
   const { gameState, confirmIssue } = usePoker();
   const [customIssue, setCustomIssue] = useState("");
   const [isCustomMode, setIsCustomMode] = useState(false);
-
-  if (!isOpen) return null;
 
   const handleSubmit = () => {
     if (isCustomMode && customIssue.trim()) {
@@ -35,26 +35,12 @@ export const IssuePickerModal = ({ isOpen, onClose }: IssuePickerModalProps) => 
   };
 
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="UPDATE ISSUE"
+      containerClassName="max-w-2xl"
     >
-      <div className="bg-card border border-border/50 rounded p-6 max-w-2xl w-full mx-4">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-medium text-foreground font-mono uppercase tracking-wider">
-            UPDATE ISSUE
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
 
         <div className="space-y-4">
           {gameState.pendingIssue && gameState.pendingIssue.source === "linear" && !isCustomMode && (
@@ -95,12 +81,11 @@ export const IssuePickerModal = ({ isOpen, onClose }: IssuePickerModalProps) => 
             <label className="text-foreground font-medium block mb-2 text-xs font-mono uppercase">
               {isCustomMode ? "Custom Issue:" : "Or enter custom issue:"}
             </label>
-            <input
+            <Input
               type="text"
               value={customIssue}
               onChange={(e) => setCustomIssue(e.target.value)}
               placeholder="Enter issue title..."
-              className="w-full bg-background text-foreground border border-border/50 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20 transition-all font-mono"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   handleSubmit();
@@ -119,26 +104,25 @@ export const IssuePickerModal = ({ isOpen, onClose }: IssuePickerModalProps) => 
           </div>
         </div>
 
-        <div className="mt-6 flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 border border-border/50 bg-transparent hover:bg-muted text-foreground font-mono text-xs py-2 px-4 rounded transition-all cursor-pointer"
-          >
-            CANCEL
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={
-              (isCustomMode && !customIssue.trim()) ||
-              (!isCustomMode && !gameState.pendingIssue && gameState.queueItems.length === 0)
-            }
-            className="flex-1 bg-foreground hover:bg-foreground/90 text-background font-mono text-xs py-2 px-4 rounded transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            LOAD ISSUE
-          </button>
-        </div>
+      <div className="mt-6 flex gap-3">
+        <Button
+          onClick={onClose}
+          variant="secondary"
+        >
+          CANCEL
+        </Button>
+        <Button
+          onClick={handleSubmit}
+          disabled={
+            (isCustomMode && !customIssue.trim()) ||
+            (!isCustomMode && !gameState.pendingIssue && gameState.queueItems.length === 0)
+          }
+          variant="primary"
+        >
+          LOAD ISSUE
+        </Button>
       </div>
-    </div>
+    </Modal>
   );
 };
 

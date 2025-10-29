@@ -1,4 +1,5 @@
-import { X } from "lucide-react";
+import { Modal } from "../ui/Modal";
+import { Button } from "../ui/Button";
 
 interface HelpModalProps {
   isOpen: boolean;
@@ -6,29 +7,13 @@ interface HelpModalProps {
 }
 
 export const HelpModal = ({ isOpen, onClose }: HelpModalProps) => {
-  if (!isOpen) return null;
-
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Help"
+      containerClassName="max-w-xl max-h-[80vh] overflow-y-auto p-4"
     >
-      <div className="border border-border/50 bg-card rounded p-4 max-w-xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-medium text-foreground uppercase tracking-wider font-mono">
-            Help
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
 
         <div className="space-y-4">
           <div>
@@ -102,15 +87,15 @@ export const HelpModal = ({ isOpen, onClose }: HelpModalProps) => {
           </div>
         </div>
 
-        <div className="mt-4 pt-3 border-t border-border/50">
-          <button
-            onClick={onClose}
-            className="w-full bg-foreground hover:bg-foreground/90 text-background font-mono text-sm py-2 px-3 rounded transition-colors"
-          >
-            CLOSE
-          </button>
-        </div>
+      <div className="mt-4 pt-3 border-t border-border/50">
+        <Button
+          onClick={onClose}
+          variant="primary"
+          className="w-full text-sm py-2 px-3"
+        >
+          CLOSE
+        </Button>
       </div>
-    </div>
+    </Modal>
   );
 };

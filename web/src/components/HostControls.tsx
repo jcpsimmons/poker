@@ -4,6 +4,7 @@ import { useState } from "react";
 import { IssuePickerModal } from "./modals/IssuePickerModal";
 import { StatsModal } from "./modals/StatsModal";
 import { Panel } from "./layout/Panel";
+import { Button } from "./ui/Button";
 
 export const HostControls = () => {
   const { gameState, reveal, clear, assignEstimate } = usePoker();
@@ -18,49 +19,49 @@ export const HostControls = () => {
     <>
       <Panel title="HOST" className="w-full md:w-80">
         <div className="flex flex-wrap gap-2">
-          <button
+          <Button
             onClick={() => setShowIssuePicker(true)}
-            className="flex-1 min-w-[100px] border border-border/50 bg-transparent hover:bg-foreground hover:text-background text-foreground font-mono text-xs py-2 px-3 rounded transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            icon={FileEdit}
+            className="flex-1 min-w-[100px]"
           >
-            <FileEdit className="w-3 h-3" />
             NEXT ISSUE
-          </button>
+          </Button>
 
           {!gameState.revealed ? (
-            <button
+            <Button
               onClick={reveal}
-              className="flex-1 min-w-[100px] border border-border/50 bg-transparent hover:bg-foreground hover:text-background text-foreground font-mono text-xs py-2 px-3 rounded transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              icon={Eye}
+              className="flex-1 min-w-[100px]"
             >
-              <Eye className="w-3 h-3" />
               REVEAL
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
               onClick={clear}
-              className="flex-1 min-w-[100px] border border-border/50 bg-transparent hover:bg-foreground hover:text-background text-foreground font-mono text-xs py-2 px-3 rounded transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              icon={RotateCcw}
+              className="flex-1 min-w-[100px]"
             >
-              <RotateCcw className="w-3 h-3" />
               CLEAR
-            </button>
+            </Button>
           )}
 
-          <button
+          <Button
             onClick={() => setShowStats(true)}
-            className="flex-1 min-w-[100px] border border-border/50 bg-transparent hover:bg-foreground hover:text-background text-foreground font-mono text-xs py-2 px-3 rounded transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            icon={BarChart3}
+            className="flex-1 min-w-[100px]"
           >
-            <BarChart3 className="w-3 h-3" />
             STATS
-          </button>
+          </Button>
 
-          <button
+          <Button
             onClick={assignEstimate}
             disabled={!gameState.revealed || !gameState.linearIssue}
-            className="flex-1 min-w-[100px] border border-border/50 bg-transparent hover:bg-foreground hover:text-background text-foreground font-mono text-xs py-2 px-3 rounded transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-foreground"
+            icon={CheckCircle2}
+            className="flex-1 min-w-[100px]"
             title={!gameState.linearIssue ? "No Linear issue active" : !gameState.revealed ? "Reveal votes first" : `Assign ${gameState.averagePoints} points to Linear issue`}
           >
-            <CheckCircle2 className="w-3 h-3" />
             ASSIGN
-          </button>
+          </Button>
         </div>
       </Panel>
 

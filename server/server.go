@@ -126,25 +126,31 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 	client := &Client{Conn: conn}
 
+	mutex.Lock()
 	clients[client] = true
+	mutex.Unlock()
 
 	go handleMessages(client)
 }
 
 // handleMessages reads messages from the client and broadcasts them to other clients.
 func handleMessages(client *Client) {
-
+	// Ensure client is removed on disconnect
 	defer func() {
-		delete(clients, client)
+		mutex.Lock()
+		if _, exists := clients[client]; exists {
+			delete(clients, client)
+			log.Printf("Client disconnected (defer): %s", client.UserID)
+		}
+		mutex.Unlock()
 		client.Conn.Close()
+		// Broadcast updated participant count after client is removed
+		broadcastParticipCount(client)
 	}()
 
 	for {
 		_, message, err := client.Conn.ReadMessage()
 		if err != nil {
-			delete(clients, client)
-			broadcastParticipCount(client)
-			client.Conn.Close()
 			log.Println("Error reading message:", err)
 			break
 		}
@@ -355,6 +361,19 @@ func validateUsername(username string) (string, error) {
 	return trimmed, nil
 }
 
+// isUsernameTaken checks if a username is already in use (case-insensitive)
+func isUsernameTaken(username string) bool {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	for client := range clients {
+		if client.UserID != "" && strings.EqualFold(client.UserID, username) {
+			return true
+		}
+	}
+	return false
+}
+
 func handleJoin(username string, sender *Client, isHost bool) {
 	// Validate username
 	validUsername, err := validateUsername(username)
@@ -364,6 +383,21 @@ func handleJoin(username string, sender *Client, isHost bool) {
 		errorMsg := types.Message{
 			Type:    types.JoinError,
 			Payload: err.Error(),
+		}
+		byteMessage := messaging.MarshallMessage(errorMsg)
+		sender.Conn.WriteMessage(websocket.TextMessage, byteMessage)
+		// Close connection
+		sender.Conn.Close()
+		delete(clients, sender)
+		return
+	}
+
+	// Check for duplicate username (case-insensitive)
+	if isUsernameTaken(validUsername) {
+		log.Printf("Duplicate username attempt: %s", validUsername)
+		errorMsg := types.Message{
+			Type:    types.JoinError,
+			Payload: "username is already taken, please choose another",
 		}
 		byteMessage := messaging.MarshallMessage(errorMsg)
 		sender.Conn.WriteMessage(websocket.TextMessage, byteMessage)

@@ -1,5 +1,7 @@
 import { usePoker } from "../../contexts/PokerContext";
 import { Shield, Activity, LogOut } from "lucide-react";
+import { Button } from "../ui/Button";
+import { Badge } from "../ui/Badge";
 
 interface HeaderProps {
   onLeave: () => void;
@@ -28,9 +30,9 @@ export const Header = ({ onLeave }: HeaderProps) => {
               {gameState.username}
             </span>
             {gameState.isHost && (
-              <span className="bg-foreground text-background px-1.5 py-0.5 rounded font-mono text-[10px]">
+              <Badge variant="primary" className="text-[10px]">
                 HOST
-              </span>
+              </Badge>
             )}
           </div>
           <div className="h-3 w-px bg-border hidden sm:block" />
@@ -53,14 +55,15 @@ export const Header = ({ onLeave }: HeaderProps) => {
             </span>
           </div>
           <div className="h-3 w-px bg-border hidden sm:block" />
-          <button
+          <Button
             onClick={handleLeave}
-            className="flex items-center gap-1.5 px-2 py-1 rounded transition-colors hover:bg-muted border border-border/50 cursor-pointer"
-            aria-label="Leave session"
+            icon={LogOut}
+            size="sm"
+            variant="base"
+            className="px-2 py-1 border-border/50 hover:bg-muted"
           >
-            <LogOut className="w-3 h-3 text-foreground" />
-            <span className="font-mono text-foreground hidden sm:inline">LEAVE</span>
-          </button>
+            <span className="hidden sm:inline">LEAVE</span>
+          </Button>
         </div>
       </div>
     </div>

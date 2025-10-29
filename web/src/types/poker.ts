@@ -159,6 +159,7 @@ export interface GameState {
   linearIssue?: LinearIssue;
   participants: number;
   votes: Vote[];
+  voters: VoterInfo[]; // All participants with their vote status
   revealed: boolean;
   myVote?: number;
   averagePoints: string;
