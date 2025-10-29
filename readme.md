@@ -68,6 +68,10 @@ poker server --announce --name "squad-alpha"
 
 # With Linear integration
 poker server --linear-cycle https://linear.app/yourorg/team/TEAM/cycle/upcoming
+
+# With ngrok (one command, share the printed URL)
+export NGROK_AUTHTOKEN=your_token_here
+poker server --ngrok
 ```
 
 Server starts on port **9867** by default.
@@ -102,20 +106,29 @@ poker server --announce --name "planning-session"
 - No external services
 - Automatic discovery
 
-### Traditional Setup (ngrok or LAN)
+### Expose via ngrok (One Command)
 
-For teams without Tailscale:
+If Tailscale isn't an option, you can expose the app securely over the internet using ngrok embedded in the server:
 
 ```bash
-# Install ngrok
-ngrok http 9867
+# 1) Build production bundle (serves web/dist)
+./build.sh
 
-# Start server
-poker server
+# 2) Set your ngrok auth token (once per machine)
+export NGROK_AUTHTOKEN=your_token_here
 
-# Share ngrok URL with team
-# They open: https://your-id.ngrok-free.app
+# 3) Start server with ngrok
+poker server --ngrok
+
+# Output includes the public URL to share with your team, e.g.:
+# Public URL: https://abc123.ngrok-free.app
+# WebSocket endpoint: wss://abc123.ngrok-free.app/ws
 ```
+
+Notes:
+- The URL changes each run (no reserved subdomain required).
+- Both the web app and WebSocket endpoint are served on the same origin.
+- You can still use the classic ngrok CLI if preferred.
 
 ### Linear Integration
 
@@ -248,7 +261,7 @@ linear:
 
 ```bash
 # Start server
-poker server [--port 9867] [--announce] [--name "session"] [--linear-cycle URL]
+poker server [--port 9867] [--announce] [--name "session"] [--linear-cycle URL] [--ngrok]
 
 # Discover sessions
 poker discover

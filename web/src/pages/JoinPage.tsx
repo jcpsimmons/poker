@@ -12,7 +12,14 @@ export const JoinPage = ({ onJoin }: JoinPageProps) => {
     return localStorage.getItem('poker_username') || '';
   });
   const [serverUrl, setServerUrl] = useState(() => {
-    return localStorage.getItem('poker_server_url') || 'ws://localhost:9867/ws';
+    // Auto-detect WebSocket URL based on current page origin
+    const savedUrl = localStorage.getItem('poker_server_url');
+    if (savedUrl) return savedUrl;
+    
+    // Derive WebSocket URL from current window location
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    return `${protocol}//${host}/ws`;
   });
   const [isHost, setIsHost] = useState(() => {
     return localStorage.getItem('poker_is_host') === 'true';

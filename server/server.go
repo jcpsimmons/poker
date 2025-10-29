@@ -50,17 +50,25 @@ var upgrader = websocket.Upgrader{
 func Start(port string) {
 	strPort := ":" + port
 
+	// Register HTTP handlers on the default mux
+	RegisterHandlers()
+
+	log.Println("Starting server on port", strPort)
+	log.Println("Serving web app on http://localhost" + strPort)
+	log.Println("WebSocket endpoint: ws://localhost" + strPort + "/ws")
+	log.Fatal(http.ListenAndServe(strPort, nil))
+}
+
+// RegisterHandlers sets up the static file server and WebSocket endpoint
+// on the default HTTP serve mux. This allows serving either on a local
+// TCP listener or any custom net.Listener (e.g., ngrok) using http.Serve.
+func RegisterHandlers() {
 	// Serve static files from web/dist
 	fs := http.FileServer(http.Dir("./web/dist"))
 	http.Handle("/", fs)
 
 	// WebSocket endpoint
 	http.HandleFunc("/ws", handler)
-
-	log.Println("Starting server on port", strPort)
-	log.Println("Serving web app on http://localhost" + strPort)
-	log.Println("WebSocket endpoint: ws://localhost" + strPort + "/ws")
-	log.Fatal(http.ListenAndServe(strPort, nil))
 }
 
 // SetLinearIssues initializes Linear integration with issues and client

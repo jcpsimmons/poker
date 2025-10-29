@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"sort"
 	"strconv"
@@ -15,6 +16,8 @@ import (
 	"github.com/jcpsimmons/poker/linear"
 	"github.com/jcpsimmons/poker/server"
 	"github.com/jcpsimmons/poker/types"
+
+	ngrok "golang.ngrok.com/ngrok/v2"
 
 	"github.com/urfave/cli/v2"
 )
@@ -31,6 +34,10 @@ func main() {
 						Name:    "announce",
 						Aliases: []string{"a"},
 						Usage:   "announce session via mDNS (requires Tailscale)",
+					},
+					&cli.BoolFlag{
+						Name:  "ngrok",
+						Usage: "expose server via ngrok (requires NGROK_AUTHTOKEN)",
 					},
 					&cli.StringFlag{
 						Name:    "name",
@@ -127,6 +134,25 @@ func main() {
 							defer shutdown()
 							log.Printf("Announcing session '%s' on port %s", sessionName, port)
 						}
+					}
+
+					if cCtx.Bool("ngrok") {
+						// Serve via ngrok with a random URL each run.
+						// Handlers are registered on the default mux so we can pass nil as handler below.
+						server.RegisterHandlers()
+
+						if os.Getenv("NGROK_AUTHTOKEN") == "" {
+							return fmt.Errorf("NGROK_AUTHTOKEN not set")
+						}
+						ln, err := ngrok.Listen(context.Background())
+						if err != nil {
+							return fmt.Errorf("failed to start ngrok listener: %w", err)
+						}
+
+						fmt.Printf("Public URL: %s\n", ln.URL())
+						wsURL := strings.Replace(ln.URL().String(), "https://", "wss://", 1)
+						fmt.Printf("WebSocket endpoint: %s/ws\n", wsURL)
+						return http.Serve(ln, nil)
 					}
 
 					server.Start(port)
