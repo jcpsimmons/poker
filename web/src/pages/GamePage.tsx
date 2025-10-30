@@ -7,12 +7,17 @@ import { HostControls } from "../components/HostControls";
 import { Confetti } from "../components/Confetti";
 import { CurrentIssue } from "../components/CurrentIssue";
 import { Queue } from "../components/Queue";
+import { TacticalFeed } from "../components/TacticalFeed";
+import { NetworkStatus } from "../components/NetworkStatus";
+import { usePoker } from "../contexts/PokerContext";
 
 interface GamePageProps {
   onLeave: () => void;
 }
 
 export const GamePage = ({ onLeave }: GamePageProps) => {
+  const { activities } = usePoker();
+  
   return (
     <div
       className="min-h-screen bg-background flex flex-col"
@@ -39,6 +44,10 @@ export const GamePage = ({ onLeave }: GamePageProps) => {
           </div>
           <div className="w-full">
             <Queue />
+          </div>
+          <div className="flex flex-col md:flex-row gap-3 items-stretch w-full">
+            <TacticalFeed activities={activities} />
+            <NetworkStatus />
           </div>
         </div>
       </main>

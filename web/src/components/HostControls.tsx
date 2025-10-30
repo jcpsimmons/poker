@@ -1,14 +1,13 @@
 import { usePoker } from "../contexts/PokerContext";
 import { Eye, RotateCcw, FileEdit, BarChart3, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
-import { IssuePickerModal } from "./modals/IssuePickerModal";
 import { StatsModal } from "./modals/StatsModal";
 import { Panel } from "./layout/Panel";
 import { Button } from "./ui/Button";
+import { toast } from "sonner";
 
 export const HostControls = () => {
-  const { gameState, reveal, clear, assignEstimate } = usePoker();
-  const [showIssuePicker, setShowIssuePicker] = useState(false);
+  const { gameState, reveal, clear, assignEstimate, confirmIssue } = usePoker();
   const [showStats, setShowStats] = useState(false);
 
   if (!gameState.isHost) {
@@ -21,7 +20,24 @@ export const HostControls = () => {
         <Panel title="HOST" className="w-full">
         <div className="flex flex-wrap gap-2">
           <Button
-            onClick={() => setShowIssuePicker(true)}
+            onClick={() => {
+              // Auto-load next issue with same logic as IssuePickerModal
+              if (gameState.pendingIssue) {
+                confirmIssue(
+                  gameState.pendingIssue.identifier,
+                  gameState.pendingIssue.queueIndex,
+                  false
+                );
+                toast.success(`Loaded issue: ${gameState.pendingIssue.identifier}`);
+              } else if (gameState.queueItems.length > 0) {
+                // If no pending issue but queue has items, load first item from queue
+                const firstItem = gameState.queueItems[0];
+                confirmIssue(firstItem.identifier, -1, firstItem.source === "custom");
+                toast.success(`Loaded issue: ${firstItem.identifier}`);
+              } else {
+                toast.info("No issues in queue");
+              }
+            }}
             icon={FileEdit}
             className="flex-1 min-w-[100px]"
           >
@@ -69,10 +85,6 @@ export const HostControls = () => {
         </Panel>
       </div>
 
-      <IssuePickerModal
-        isOpen={showIssuePicker}
-        onClose={() => setShowIssuePicker(false)}
-      />
       <StatsModal isOpen={showStats} onClose={() => setShowStats(false)} />
     </>
   );

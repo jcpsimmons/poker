@@ -22,7 +22,7 @@ export const VoteDisplay = () => {
   if (gameState.votes.length === 0) {
     return (
       <Panel 
-        title="VOTES" 
+        title="RESULTS" 
         className="w-full md:w-80 min-h-[400px] flex flex-col"
         contentClassName="flex flex-col flex-1"
       >
@@ -35,7 +35,7 @@ export const VoteDisplay = () => {
 
   return (
     <Panel 
-      title="VOTES" 
+      title="RESULTS" 
       className="w-full md:w-80 flex flex-col"
       contentClassName="flex flex-col flex-1"
     >

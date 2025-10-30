@@ -58,7 +58,15 @@ export class PokerWebSocket {
           this.ws.close();
         }
 
-        this.ws = new WebSocket(this.url);
+        // Get auth credentials from localStorage if available
+        const auth = localStorage.getItem('poker_auth');
+        let wsUrl = this.url;
+        if (auth) {
+          // Append auth as query parameter for WebSocket connections
+          wsUrl += `?auth=${encodeURIComponent(auth)}`;
+        }
+
+        this.ws = new WebSocket(wsUrl);
 
         this.ws.onopen = () => {
           console.log("WebSocket connected");

@@ -1,6 +1,7 @@
 import { usePoker } from "../../contexts/PokerContext";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
+import { useMetrics } from "../../hooks/useMetrics";
 
 interface StatsModalProps {
   isOpen: boolean;
@@ -8,7 +9,8 @@ interface StatsModalProps {
 }
 
 export const StatsModal = ({ isOpen, onClose }: StatsModalProps) => {
-  const { gameState } = usePoker();
+  const { gameState, computedMetrics } = usePoker();
+  const { metrics: metricsState } = useMetrics();
 
   return (
     <Modal
@@ -51,6 +53,41 @@ export const StatsModal = ({ isOpen, onClose }: StatsModalProps) => {
             <span className={`font-medium text-sm font-mono ${gameState.revealed ? "text-green-500" : "text-foreground"}`}>
               {gameState.revealed ? "REVEALED" : "VOTING"}
             </span>
+          </div>
+
+          <div className="flex justify-between items-center py-2 border-b border-border/50">
+            <span className="text-muted-foreground font-mono text-xs">SESSION DURATION</span>
+            <span className="font-medium text-sm font-mono">{computedMetrics.sessionUptime}</span>
+          </div>
+
+          <div className="flex justify-between items-center py-2 border-b border-border/50">
+            <span className="text-muted-foreground font-mono text-xs">AVG ROUND TIME</span>
+            <span className="font-medium text-sm font-mono">{computedMetrics.avgRoundTime}</span>
+          </div>
+
+          <div className="flex justify-between items-center py-2 border-b border-border/50">
+            <span className="text-muted-foreground font-mono text-xs">CONSENSUS RATE</span>
+            <span className="font-medium text-sm font-mono">{computedMetrics.consensusRate.toFixed(1)}%</span>
+          </div>
+
+          <div className="flex justify-between items-center py-2 border-b border-border/50">
+            <span className="text-muted-foreground font-mono text-xs">CONNECTION STABILITY</span>
+            <span className={`font-medium text-sm font-mono ${
+              computedMetrics.connectionStability === "STABLE" ? "text-green-500" :
+              computedMetrics.connectionStability === "UNSTABLE" ? "text-yellow-500" : "text-red-500"
+            }`}>
+              {computedMetrics.connectionStability}
+            </span>
+          </div>
+
+          <div className="flex justify-between items-center py-2 border-b border-border/50">
+            <span className="text-muted-foreground font-mono text-xs">TOTAL MESSAGES</span>
+            <span className="font-medium text-sm font-mono">{metricsState.totalMessages}</span>
+          </div>
+
+          <div className="flex justify-between items-center py-2 border-b border-border/50">
+            <span className="text-muted-foreground font-mono text-xs">MESSAGE THROUGHPUT</span>
+            <span className="font-medium text-sm font-mono">{computedMetrics.messageThroughput} msg/min</span>
           </div>
         </div>
 

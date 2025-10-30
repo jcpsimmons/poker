@@ -55,11 +55,21 @@ func main() {
 						Usage: "Linear cycle URL to pull issues from (e.g., https://linear.app/customerio/team/CDP/cycle/upcoming)",
 						Value: "",
 					},
+					&cli.StringFlag{
+						Name:  "auth-password",
+						Usage: "Password for HTTP Basic Authentication (username: 'admin')",
+					},
 				},
 				Action: func(cCtx *cli.Context) error {
 					port := cCtx.String("port")
 					sessionName := cCtx.String("name")
 					linearCycleURL := cCtx.String("linear-cycle")
+					authPassword := cCtx.String("auth-password")
+
+					// Configure authentication if password provided
+					if authPassword != "" {
+						server.SetBasicAuth("admin", authPassword)
+					}
 
 					// Default session name to hostname if not provided
 					if sessionName == "" {

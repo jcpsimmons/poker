@@ -59,6 +59,11 @@
       sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Very subtle grid background */
+    background-image: 
+      linear-gradient(hsl(var(--border) / 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.05) 1px, transparent 1px);
+    background-size: 20px 20px;
   }
 }
 

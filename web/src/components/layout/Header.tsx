@@ -1,19 +1,25 @@
 import { usePoker } from "../../contexts/PokerContext";
-import { Shield, Activity, LogOut } from "lucide-react";
+import { Shield, Activity, LogOut, AlertTriangle } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Badge } from "../ui/Badge";
+import { cn } from "../../lib/utils";
 
 interface HeaderProps {
   onLeave: () => void;
 }
 
 export const Header = ({ onLeave }: HeaderProps) => {
-  const { gameState, leave } = usePoker();
+  const { gameState, leave, computedMetrics } = usePoker();
 
   const handleLeave = () => {
     leave();
     onLeave();
   };
+
+  const networkQuality = computedMetrics.connectionStability === "STABLE" ? "EXCELLENT" : 
+                         computedMetrics.connectionStability === "UNSTABLE" ? "DEGRADED" : "POOR";
+  const networkColor = computedMetrics.connectionStability === "STABLE" ? "text-green-500" :
+                       computedMetrics.connectionStability === "UNSTABLE" ? "text-yellow-500" : "text-red-500";
 
   return (
     <div className="border-b border-border/50 bg-background">
@@ -47,12 +53,17 @@ export const Header = ({ onLeave }: HeaderProps) => {
                 }`}
               />
             </div>
-            <span className={`font-mono ${gameState.connected ? 'text-green-500' : 'text-red-500'}`}>
+            <span className={`font-mono text-xs ${gameState.connected ? 'text-green-500' : 'text-red-500'}`}>
               {gameState.connected ? 'LINK' : 'DOWN'}
             </span>
-            <span className="text-muted-foreground font-mono hidden md:inline">
+            <span className="text-muted-foreground font-m+) text-xs hidden md:inline">
               {window.location.host.split(':')[0]}
             </span>
+          </div>
+          <div className="h-3 w-px bg-border hidden xl:block" />
+          <div className="items-center gap-1.5 hidden xl:flex">
+            <AlertTriangle className={cn("w-3 h-3", networkColor)} />
+            <span className={cn("font-mono text-xs", networkColor)}>{networkQuality}</span>
           </div>
           <div className="h-3 w-px bg-border hidden sm:block" />
           <Button

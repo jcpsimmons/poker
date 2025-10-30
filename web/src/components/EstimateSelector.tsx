@@ -9,7 +9,7 @@ export const EstimateSelector = () => {
 
   return (
     <Panel 
-      title="VOTE" 
+      title="ESTIMATE" 
       className="w-full md:w-80 min-h-[400px] flex flex-col"
       contentClassName="flex flex-col flex-1"
     >

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { usePoker } from "../contexts/PokerContext";
-import { User, Server, Crown, AlertCircle } from "lucide-react";
+import { User, Server, Crown, AlertCircle, Lock } from "lucide-react";
 import { Input } from "../components/ui/Input";
 
 interface JoinPageProps {
@@ -60,6 +60,10 @@ export const JoinPage = ({ onJoin }: JoinPageProps) => {
     const host = window.location.host;
     return `${protocol}//${host}/ws`;
   });
+  const [password, setPassword] = useState(() => {
+    // Load password from localStorage (note: this is the plain password, not encoded)
+    return localStorage.getItem('poker_auth_password') || '';
+  });
   const [isHost, setIsHost] = useState(() => {
     return localStorage.getItem('poker_is_host') === 'true';
   });
@@ -103,6 +107,17 @@ export const JoinPage = ({ onJoin }: JoinPageProps) => {
       localStorage.setItem('poker_server_url', serverUrl);
       localStorage.setItem('poker_is_host', isHost.toString());
       
+      // Store password if provided and encode credentials for WebSocket
+      if (password) {
+        localStorage.setItem('poker_auth_password', password);
+        const credentials = btoa(`admin:${password}`);
+        localStorage.setItem('poker_auth', credentials);
+      } else {
+        // Clear auth if password is empty
+        localStorage.removeItem('poker_auth');
+        localStorage.removeItem('poker_auth_password');
+      }
+      
       await connect(serverUrl, username, isHost);
       onJoin();
     } catch (err) {
@@ -112,6 +127,10 @@ export const JoinPage = ({ onJoin }: JoinPageProps) => {
         setError("Connection timeout. Make sure the server is running and accessible.");
       } else if (errorMessage.includes("refused")) {
         setError("Connection refused. The server may not be running.");
+      } else if (errorMessage.includes("401") || errorMessage.includes("Unauthorized")) {
+        setError("Authentication failed. Please check your password.");
+        // Clear stored credentials on auth failure to allow retry
+        localStorage.removeItem('poker_auth');
       } else {
         setError(`Failed to connect: ${errorMessage}`);
       }
@@ -172,6 +191,21 @@ export const JoinPage = ({ onJoin }: JoinPageProps) => {
                 value={serverUrl}
                 onChange={(e) => setServerUrl(e.target.value)}
                 placeholder="ws://localhost:9867/ws"
+                className="px-2 py-1.5"
+                onKeyDown={(e) => e.key === "Enter" && handleConnect()}
+              />
+            </div>
+
+            <div>
+              <label className="block text-foreground text-xs font-medium mb-1 flex items-center gap-1.5 font-mono uppercase">
+                <Lock className="w-3 h-3" />
+                PASSWORD (OPTIONAL)
+              </label>
+              <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter password if required"
                 className="px-2 py-1.5"
                 onKeyDown={(e) => e.key === "Enter" && handleConnect()}
               />

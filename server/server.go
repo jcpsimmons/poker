@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -61,6 +62,77 @@ var justAssignedEstimate bool = false
 // mutex is used to synchronize access to the clients map.
 var mutex = &sync.Mutex{}
 
+// Basic authentication configuration
+var (
+	basicAuthUsername = "admin"
+	basicAuthPassword = ""
+	authEnabled       = false
+)
+
+// SetBasicAuth configures HTTP Basic Authentication
+func SetBasicAuth(username, password string) {
+	if password != "" {
+		basicAuthUsername = username
+		basicAuthPassword = password
+		authEnabled = true
+		log.Println("HTTP Basic Authentication enabled")
+	}
+}
+
+// basicAuthMiddleware checks HTTP Basic Auth for both HTTP and WebSocket requests
+func basicAuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Skip auth if not enabled
+		if !authEnabled {
+			next(w, r)
+			return
+		}
+
+		// Check if this is a WebSocket upgrade request
+		isWebSocket := r.Header.Get("Upgrade") == "websocket"
+
+		var auth string
+		if isWebSocket {
+			// For WebSocket, get credentials from query parameter
+			auth = r.URL.Query().Get("auth")
+			if auth != "" {
+				// Query param already contains base64-encoded credentials
+				// Convert to format compatible with HTTP Basic Auth parsing
+				auth = "Basic " + auth
+			}
+		} else {
+			// For regular HTTP requests, get from Authorization header
+			auth = r.Header.Get("Authorization")
+		}
+
+		// Validate credentials
+		if auth == "" || !strings.HasPrefix(auth, "Basic ") {
+			w.Header().Set("WWW-Authenticate", `Basic realm="Planning Poker"`)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		// Decode credentials
+		encoded := strings.TrimPrefix(auth, "Basic ")
+		decoded, err := base64.StdEncoding.DecodeString(encoded)
+		if err != nil {
+			w.Header().Set("WWW-Authenticate", `Basic realm="Planning Poker"`)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		parts := strings.SplitN(string(decoded), ":", 2)
+		if len(parts) != 2 || parts[0] != basicAuthUsername || parts[1] != basicAuthPassword {
+			w.Header().Set("WWW-Authenticate", `Basic realm="Planning Poker"`)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		// Authentication successful, proceed with request
+		next(w, r)
+	}
+}
+
 // upgrader is used to upgrade HTTP connections to WebSocket connections.
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
@@ -84,12 +156,12 @@ func Start(port string) {
 // on the default HTTP serve mux. This allows serving either on a local
 // TCP listener or any custom net.Listener (e.g., ngrok) using http.Serve.
 func RegisterHandlers() {
-	// Serve static files from web/dist
+	// Serve static files from web/dist (no auth - let users load the app)
 	fs := http.FileServer(http.Dir("./web/dist"))
 	http.Handle("/", fs)
 
-	// WebSocket endpoint
-	http.HandleFunc("/ws", handler)
+	// WebSocket endpoint with auth middleware (only protect the WS connection)
+	http.HandleFunc("/ws", basicAuthMiddleware(handler))
 }
 
 // SetLinearIssues initializes Linear integration with issues and client

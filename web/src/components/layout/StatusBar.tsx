@@ -1,10 +1,10 @@
 import { usePoker } from "../../contexts/PokerContext";
-import { HelpCircle, Users, Clock, Dices } from "lucide-react";
+import { HelpCircle, Users, Clock, Dices, Timer, MessageSquare, Activity } from "lucide-react";
 import { useState } from "react";
 import { HelpModal } from "../modals/HelpModal";
 
 export const StatusBar = () => {
-  const { gameState } = usePoker();
+  const { gameState, computedMetrics } = usePoker();
   const [showHelp, setShowHelp] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
 
@@ -51,12 +51,27 @@ export const StatusBar = () => {
             <div className="h-3 w-px bg-border" />
             <div className="flex items-center gap-1.5">
               <Clock className="w-3 h-3 text-muted-foreground" />
-              <span className="text-foreground">{gameState.averagePoints}</span>
+              <span className="text-foreground font-mono">{gameState.averagePoints}</span>
             </div>
             <div className="h-3 w-px bg-border" />
             <div className="flex items-center gap-1.5">
               <Dices className="w-3 h-3 text-muted-foreground" />
-              <span className="text-foreground">R{gameState.roundNumber}</span>
+              <span className="text-foreground font-mono">R{gameState.roundNumber}</span>
+            </div>
+            <div className="h-3 w-px bg-border hidden sm:block" />
+            <div className="flex items-center gap-1.5 hidden sm:flex">
+              <Timer className="w-3 h-3 text-muted-foreground" />
+              <span className="text-foreground font-mono">{computedMetrics.sessionUptime}</span>
+            </div>
+            <div className="h-3 w-px bg-border hidden md:block" />
+            <div className="flex items-center gap-1.5 hidden md:flex">
+              <Activity className="w-3 h-3 text-muted-foreground" />
+              <span className="text-foreground font-mono">{computedMetrics.roundDuration}</span>
+            </div>
+            <div className="h-3 w-px bg-border hidden lg:block" />
+            <div className="flex items-center gap-1.5 hidden lg:flex">
+              <MessageSquare className="w-3 h-3 text-muted-foreground" />
+              <span className="text-foreground font-mono">{computedMetrics.messageThroughput}/min</span>
             </div>
           </div>
           <div className="flex items-center gap-2">

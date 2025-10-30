@@ -5,10 +5,14 @@ import type {
   Message,
 } from "../types/poker";
 import { messageHandlers } from "../lib/messageHandlers";
+import { useMetrics, type ComputedMetrics } from "../hooks/useMetrics";
+import { logActivity, type ActivityEntry } from "../lib/activityLogger";
 
 interface PokerContextType {
   gameState: GameState;
   ws: PokerWebSocket | null;
+  activities: ActivityEntry[];
+  computedMetrics: ComputedMetrics;
   connect: (url: string, username: string, isHost: boolean) => Promise<void>;
   disconnect: () => void;
   leave: () => void;
@@ -40,10 +44,15 @@ interface PokerProviderProps {
 
 export const PokerProvider: React.FC<PokerProviderProps> = ({ children, onAutoReconnectFailed }) => {
   const [ws, setWs] = useState<PokerWebSocket | null>(null);
+  const [activities, setActivities] = useState<ActivityEntry[]>([]);
   // Use refs to access latest state and ws in setTimeout callbacks
   const gameStateRef = useRef<GameState | null>(null);
   const wsRef = useRef<PokerWebSocket | null>(null);
   const reconnectAttempted = useRef(false); // Prevent multiple reconnect attempts
+  const { metrics, startConnection, trackReconnect, trackMessage, startRound, computeMetrics } = useMetrics();
+  const [computedMetrics, setComputedMetrics] = useState<ComputedMetrics>(() => 
+    computeMetrics([], 1)
+  );
   const [gameState, setGameState] = useState<GameState>(() => {
     // Restore state from localStorage if available
     const hasActiveSession = localStorage.getItem('poker_active_session') === 'true';
@@ -90,11 +99,105 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children, onAutoRe
     wsRef.current = ws;
   }, [ws]);
 
+  // Update computed metrics whenever game state or metrics change
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setComputedMetrics(computeMetrics(gameState.votes, gameState.roundNumber));
+    }, 1000);
+    // Also update immediately
+    setComputedMetrics(computeMetrics(gameState.votes, gameState.roundNumber));
+    return () => clearInterval(interval);
+  }, [computeMetrics, gameState.votes, gameState.roundNumber, metrics]);
+
   const handleMessage = useCallback((message: Message) => {
     const isDev = import.meta.env.DEV;
     
     if (isDev) {
       console.log("Received message:", message);
+    }
+
+    // Track message for metrics
+    trackMessage();
+
+    // Log activities based on message type
+    const currentState = gameStateRef.current || gameState;
+    switch (message.type) {
+      case "voteStatus": {
+        // Check if someone voted (new vote in the list)
+        const payload = typeof message.payload === 'string' 
+          ? JSON.parse(message.payload) 
+          : message.payload;
+        if (payload?.voters) {
+          const newVoters = payload.voters.filter((v: any) => v.hasVoted);
+          const prevVoters = currentState.voters || [];
+          newVoters.forEach((voter: any) => {
+            // Only log if this voter wasn't in the previous state or wasn't voted before
+            const prevVoter = prevVoters.find((v) => v.username === voter.username);
+            if (!prevVoter || !prevVoter.hasVoted) {
+              setActivities((prev) => {
+                const updated = [...prev, logActivity("VOTE", `${voter.username} submitted estimate`)];
+                return updated.slice(-100);
+              });
+            }
+          });
+        }
+        break;
+      }
+      case "revealData":
+        setActivities((prev) => {
+          const updated = [...prev, logActivity("REVEAL", "all votes disclosed")];
+          return updated.slice(-100);
+        });
+        break;
+      case "clearBoard":
+        const avg = currentState.averagePoints !== "0" ? currentState.averagePoints : "N/A";
+        setActivities((prev) => {
+          const updated = [...prev, logActivity("RESET", `round completed, avg=${avg}`)];
+          return updated.slice(-100);
+        });
+        startRound(); // Track new round start
+        break;
+      case "currentIssue":
+        if (currentState.roundNumber > 1) {
+          setActivities((prev) => {
+            const updated = [...prev, logActivity("ROUND_START", `round ${currentState.roundNumber}`)];
+            return updated.slice(-100);
+          });
+        }
+        break;
+      case "issueLoaded": {
+        const payload = typeof message.payload === 'string' 
+          ? JSON.parse(message.payload) 
+          : message.payload;
+        if (payload?.title) {
+          setActivities((prev) => {
+            const updated = [...prev, logActivity("ISSUE_LOADED", payload.title)];
+            return updated.slice(-100);
+          });
+        }
+        break;
+      }
+      case "queueSync":
+        // Don't log every queueSync as it's too frequent
+        break;
+      case "participantCount": {
+        const prevCount = currentState.participants;
+        const newCount = typeof message.payload === 'string' 
+          ? parseInt(message.payload, 10) 
+          : message.payload;
+        if (typeof newCount === 'number' && newCount > prevCount) {
+          setActivities((prev) => {
+            const updated = [...prev, logActivity("CONNECT", `participant count: ${newCount}`)];
+            return updated.slice(-100);
+          });
+        } else if (typeof newCount === 'number' && newCount < prevCount) {
+          setActivities((prev) => {
+            const updated = [...prev, logActivity("DISCONNECT", `participant count: ${newCount}`)];
+            return updated.slice(-100);
+          });
+        }
+        break;
+      }
     }
 
     // Find handler for this message type
@@ -123,7 +226,7 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children, onAutoRe
     } catch (error) {
       console.error(`Error handling message type ${message.type}:`, error);
     }
-  }, [gameState, wsRef, gameStateRef]);
+  }, [gameState, wsRef, gameStateRef, trackMessage, startRound]);
 
   const connect = useCallback(
     async (url: string, username: string, isHost: boolean) => {
@@ -133,6 +236,11 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children, onAutoRe
 
       // Set connected state immediately after WebSocket opens
       setWs(websocket);
+      startConnection();
+      setActivities((prev) => {
+        const updated = [...prev, logActivity("CONNECT", `${username} joined session`)];
+        return updated.slice(-100);
+      });
       setGameState((prev) => ({
         ...prev,
         connected: true,
@@ -143,12 +251,21 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children, onAutoRe
       // Update UI when connection drops
       websocket.onDisconnect(() => {
         console.log("WebSocket disconnected, updating UI...");
+        setActivities((prev) => {
+          const updated = [...prev, logActivity("DISCONNECT", "connection lost")];
+          return updated.slice(-100);
+        });
         setGameState((prev) => ({ ...prev, connected: false }));
       });
 
       // Re-join session when WebSocket reconnects automatically
       websocket.onReconnect(() => {
         console.log("WebSocket reconnected, re-joining session...");
+        trackReconnect();
+        setActivities((prev) => {
+          const updated = [...prev, logActivity("CONNECT", "connection restored")];
+          return updated.slice(-100);
+        });
         websocket.joinSession(username, isHost);
         setGameState((prev) => ({ ...prev, connected: true }));
       });
@@ -224,6 +341,7 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children, onAutoRe
     localStorage.removeItem('poker_username');
     localStorage.removeItem('poker_server_url');
     localStorage.removeItem('poker_is_host');
+    localStorage.removeItem('poker_session_start');
     
     // Reset game state to initial
     setGameState({
@@ -240,6 +358,9 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children, onAutoRe
       roundNumber: 1,
       queueItems: [],
     });
+    
+    // Clear activities
+    setActivities([]);
   }, [ws]);
 
   const addQueueItem = useCallback(
@@ -385,6 +506,8 @@ export const PokerProvider: React.FC<PokerProviderProps> = ({ children, onAutoRe
   const value: PokerContextType = {
     gameState,
     ws,
+    activities,
+    computedMetrics,
     connect,
     disconnect,
     leave,
