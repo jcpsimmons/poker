@@ -15,7 +15,7 @@ export const StatusBar = () => {
 
   return (
     <>
-      <div className="border-t border-border/50 bg-background px-3 py-1.5">
+      <div className="sticky bottom-0 border-t border-border/50 bg-background/95 backdrop-blur-sm px-3 py-1.5 z-10">
         <div className="container mx-auto flex items-center justify-between text-xs font-mono">
           <div className="flex items-center gap-3">
             <div 

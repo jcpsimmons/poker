@@ -57,6 +57,7 @@ Open http://localhost:5173 while the Go server runs in another terminal.
 | `poker server --announce --name "team-planning"` | Broadcast the session over Tailscale/mDNS for one-click LAN discovery. |
 | `poker server --linear-cycle <Linear cycle URL>` | Pull unestimated issues from Linear and post results back. |
 | `poker server --ngrok` | Start the server and expose it with ngrok (requires `NGROK_AUTHTOKEN`). |
+| `poker server --auth-password "yourpassword"` | Protect the WebSocket connection with a password. |
 | `poker discover` | List LAN/Tailscale sessions advertising via mDNS. |
 
 ## Quick Play
@@ -102,6 +103,35 @@ poker server --linear-cycle https://linear.app/yourorg/team/TEAM/cycle/upcoming
 ```
 
 Hosts get automatic issue suggestions and results are posted back to Linear as comments.
+</details>
+
+<details>
+<summary>Password protection</summary>
+
+When exposing your server publicly (via ngrok or the internet), protect it with a password:
+
+```bash
+poker server --ngrok --auth-password "your-secure-password"
+```
+
+**How it works:**
+- Only the WebSocket connection is protected (static files load without auth)
+- Users see a password field on the join page
+- Enter the password once to connect
+- Credentials persist across reconnections
+
+**Security notes:**
+- Use a strong password when exposing via ngrok
+- Combine with Tailscale ACLs for network-level security
+- The username is hardcoded to `admin` (WebSocket auth only)
+- For public deployments, consider additional security measures
+
+**Example with Linear + ngrok:**
+```bash
+poker server --ngrok --linear-cycle <url> --auth-password "team-password-123"
+```
+
+Share the ngrok URL and password with your team.
 </details>
 
 ## Testing

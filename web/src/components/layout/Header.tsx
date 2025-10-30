@@ -22,7 +22,7 @@ export const Header = ({ onLeave }: HeaderProps) => {
                        computedMetrics.connectionStability === "UNSTABLE" ? "text-yellow-500" : "text-red-500";
 
   return (
-    <div className="border-b border-border/50 bg-background">
+    <div className="sticky top-0 border-b border-border/50 bg-background/95 backdrop-blur-sm z-10">
       <div className="container mx-auto px-3 py-2 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Shield className="w-4 h-4 text-foreground" />
