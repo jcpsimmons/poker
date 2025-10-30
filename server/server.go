@@ -22,9 +22,20 @@ import (
 
 type Client struct {
 	Conn            *websocket.Conn
+	writeMutex      sync.Mutex // Serializes writes to this connection
 	UserID          string
 	CurrentEstimate int64
 	IsHost          bool
+}
+
+// WriteMessage safely writes to the WebSocket connection with mutex protection
+func (c *Client) WriteMessage(messageType int, data []byte) error {
+	c.writeMutex.Lock()
+	defer c.writeMutex.Unlock()
+	if c.Conn == nil {
+		return websocket.ErrCloseSent // Connection already closed
+	}
+	return c.Conn.WriteMessage(messageType, data)
 }
 
 // clients stores all active client connections.
@@ -415,6 +426,16 @@ func isUsernameTaken(username string) bool {
 	return false
 }
 
+// isUsernameTakenUnlocked checks if username exists (caller must hold mutex)
+func isUsernameTakenUnlocked(username string) bool {
+	for client := range clients {
+		if client.UserID != "" && strings.EqualFold(client.UserID, username) {
+			return true
+		}
+	}
+	return false
+}
+
 // hasHost checks if there's already a host in the session
 func hasHost() bool {
 	mutex.Lock()
@@ -428,85 +449,87 @@ func hasHost() bool {
 	return false
 }
 
-func handleJoin(username string, sender *Client, isHost bool) bool {
-	log.Printf("[handleJoin] START - username: %s, isHost: %v, client: %p, current UserID: %s", username, isHost, sender, sender.UserID)
+// hasHostUnlocked checks if host exists (caller must hold mutex)
+func hasHostUnlocked() bool {
+	for client := range clients {
+		if client.IsHost {
+			return true
+		}
+	}
+	return false
+}
 
-	// Validate username
+func handleJoin(username string, sender *Client, isHost bool) bool {
+	log.Printf("[handleJoin] START - username: %s, isHost: %v, client: %p", username, isHost, sender)
+
+	// Step 1: Validate username (safe outside mutex - no shared state access)
 	validUsername, err := validateUsername(username)
 	if err != nil {
-		log.Printf("[handleJoin] VALIDATION FAILED - username: %s - %v", username, err)
-		// Send error message to client
+		log.Printf("[handleJoin] VALIDATION FAILED - %v", err)
 		errorMsg := types.Message{
 			Type:    types.JoinError,
 			Payload: err.Error(),
 		}
 		byteMessage := messaging.MarshallMessage(errorMsg)
-		if writeErr := sender.Conn.WriteMessage(websocket.TextMessage, byteMessage); writeErr != nil {
-			log.Printf("[handleJoin] Error writing validation error: %v", writeErr)
-		}
-		// Close connection
+		sender.WriteMessage(websocket.TextMessage, byteMessage)
 		sender.Conn.Close()
-		log.Printf("[handleJoin] Closed connection after validation failure")
-		// Remove from clients map with mutex protection
+
+		// Remove from clients map
 		mutex.Lock()
-		_, existed := clients[sender]
 		delete(clients, sender)
 		mutex.Unlock()
-		log.Printf("[handleJoin] Removed from clients map (existed: %v), returning false", existed)
 		return false
 	}
 
-	// Check for duplicate username (case-insensitive)
-	if isUsernameTaken(validUsername) {
-		log.Printf("[handleJoin] DUPLICATE USERNAME - username: %s", validUsername)
+	// Step 2: Atomic check + set (critical section)
+	mutex.Lock()
+
+	// Check duplicate username
+	if isUsernameTakenUnlocked(validUsername) {
+		mutex.Unlock()
+		log.Printf("[handleJoin] DUPLICATE USERNAME - %s", validUsername)
 		errorMsg := types.Message{
 			Type:    types.JoinError,
 			Payload: "username is already taken, please choose another",
 		}
 		byteMessage := messaging.MarshallMessage(errorMsg)
-		if writeErr := sender.Conn.WriteMessage(websocket.TextMessage, byteMessage); writeErr != nil {
-			log.Printf("[handleJoin] Error writing duplicate error: %v", writeErr)
-		}
-		// Close connection
+		sender.WriteMessage(websocket.TextMessage, byteMessage)
 		sender.Conn.Close()
-		log.Printf("[handleJoin] Closed connection after duplicate username")
-		// Remove from clients map with mutex protection
+
+		// Remove from clients map (safe without mutex - we just released it and client isn't fully joined)
 		mutex.Lock()
-		_, existed := clients[sender]
 		delete(clients, sender)
 		mutex.Unlock()
-		log.Printf("[handleJoin] Removed from clients map (existed: %v), returning false", existed)
 		return false
 	}
 
-	// Check if trying to join as host when there's already a host
-	if isHost && hasHost() {
-		log.Printf("[handleJoin] MULTIPLE HOST - username: %s tried to join as host", validUsername)
+	// Check multiple host
+	if isHost && hasHostUnlocked() {
+		mutex.Unlock()
+		log.Printf("[handleJoin] MULTIPLE HOST - %s tried to join", validUsername)
 		errorMsg := types.Message{
 			Type:    types.JoinError,
 			Payload: "a host is already in this session, please join as a player",
 		}
 		byteMessage := messaging.MarshallMessage(errorMsg)
-		if writeErr := sender.Conn.WriteMessage(websocket.TextMessage, byteMessage); writeErr != nil {
-			log.Printf("[handleJoin] Error writing multiple host error: %v", writeErr)
-		}
-		// Close connection
+		sender.WriteMessage(websocket.TextMessage, byteMessage)
 		sender.Conn.Close()
-		log.Printf("[handleJoin] Closed connection after multiple host")
-		// Remove from clients map with mutex protection
+
 		mutex.Lock()
-		_, existed := clients[sender]
 		delete(clients, sender)
 		mutex.Unlock()
-		log.Printf("[handleJoin] Removed from clients map (existed: %v), returning false", existed)
 		return false
 	}
 
+	// ATOMICALLY set client fields (still holding mutex)
 	sender.UserID = validUsername
 	sender.CurrentEstimate = 0
 	sender.IsHost = isHost
 
-	log.Println("User joined: ", validUsername)
+	mutex.Unlock()
+	// End of critical section
+
+	log.Println("User joined:", validUsername)
 
 	// Auto-load first issue if in Linear mode, host joins, no current issue, and queue has Linear items
 	if isHost && linearClient != nil && currentIssue == "" && len(queueItems) > 0 {
@@ -576,21 +599,24 @@ func handleJoin(username string, sender *Client, isHost bool) bool {
 }
 
 func getFormattedRevealData() []types.UserEstimate {
-
 	estimates := make([]types.UserEstimate, 0)
 
+	mutex.Lock()
 	for client := range clients {
 		estimates = append(estimates, types.UserEstimate{
 			User:     client.UserID,
 			Estimate: strconv.FormatInt(client.CurrentEstimate, 10),
 		})
 	}
+	mutex.Unlock()
+
 	return estimates
 }
 
 func getPointAverage() int64 {
 	possibleEstimates := []int64{1, 2, 3, 5, 8, 13}
 
+	mutex.Lock()
 	var total int64
 	didntEstimate := 0
 	for client := range clients {
@@ -600,9 +626,10 @@ func getPointAverage() int64 {
 			didntEstimate++
 		}
 	}
-	log.Println("Estimate average request")
-
 	clientsLessAbsentia := len(clients) - didntEstimate
+	mutex.Unlock()
+
+	log.Println("Estimate average request")
 	if clientsLessAbsentia == 0 {
 		return 0
 	}
@@ -650,7 +677,10 @@ func handleReset(client *Client) {
 }
 
 func broadcastParticipCount(client *Client) {
+	mutex.Lock()
 	numberOfParticipants := len(clients)
+	mutex.Unlock()
+
 	log.Println("Participants: ", numberOfParticipants)
 	pcMessage := types.Message{
 		Type:    types.ParticipantCount,
@@ -663,6 +693,7 @@ func broadcastParticipCount(client *Client) {
 func broadcastVoteStatus(client *Client) {
 	voters := make([]types.VoterInfo, 0)
 
+	mutex.Lock()
 	for c := range clients {
 		if c.UserID != "" {
 			hasVoted := c.CurrentEstimate > 0
@@ -673,6 +704,7 @@ func broadcastVoteStatus(client *Client) {
 			})
 		}
 	}
+	mutex.Unlock()
 
 	voteStatusMsg := types.VoteStatusMessage{
 		Type: types.VoteStatus,
@@ -698,7 +730,7 @@ func countVoted(voters []types.VoterInfo) int {
 
 func sendClientMessage(client *Client, message types.Message) {
 	byteMessage := messaging.MarshallMessage(message)
-	if err := client.Conn.WriteMessage(websocket.TextMessage, byteMessage); err != nil {
+	if err := client.WriteMessage(websocket.TextMessage, byteMessage); err != nil {
 		log.Printf("Error writing message to client %s: %v", client.UserID, err)
 		// Don't crash the server, just log the error
 		// The client will be cleaned up by the read loop when it detects the broken connection
@@ -707,11 +739,18 @@ func sendClientMessage(client *Client, message types.Message) {
 
 // broadcast sends a message to all clients except the sender.
 func broadcast(message []byte, sender *Client) {
-	// Step 1: Copy client list while holding the lock (don't do network I/O under lock)
+	// Step 1: Copy client list and UserIDs while holding the lock (don't do network I/O under lock)
+	type clientInfo struct {
+		client *Client
+		userID string
+	}
 	mutex.Lock()
-	clientList := make([]*Client, 0, len(clients))
+	clientList := make([]clientInfo, 0, len(clients))
 	for client := range clients {
-		clientList = append(clientList, client)
+		clientList = append(clientList, clientInfo{
+			client: client,
+			userID: client.UserID,
+		})
 	}
 	mutex.Unlock()
 
@@ -719,11 +758,11 @@ func broadcast(message []byte, sender *Client) {
 
 	// Step 2: Send to all clients without holding the lock
 	var deadClients []*Client
-	for _, client := range clientList {
-		log.Println("broadcast to client: ", client.UserID)
-		if err := client.Conn.WriteMessage(websocket.TextMessage, message); err != nil {
-			log.Printf("Error writing message to client %s: %v (marking for cleanup)", client.UserID, err)
-			deadClients = append(deadClients, client)
+	for _, info := range clientList {
+		log.Println("broadcast to client: ", info.userID)
+		if err := info.client.WriteMessage(websocket.TextMessage, message); err != nil {
+			log.Printf("Error writing message to client %s: %v (marking for cleanup)", info.userID, err)
+			deadClients = append(deadClients, info.client)
 		}
 	}
 
@@ -809,7 +848,7 @@ func suggestIssueToHost(host *Client) {
 	}
 
 	byteMessage := messaging.MarshallMessage(suggestion)
-	if err := host.Conn.WriteMessage(websocket.TextMessage, byteMessage); err != nil {
+	if err := host.WriteMessage(websocket.TextMessage, byteMessage); err != nil {
 		log.Printf("Error sending issue suggestion to host %s: %v", host.UserID, err)
 	} else {
 		log.Printf("Sent issue suggestion to host: %s", host.UserID)
@@ -830,9 +869,6 @@ func suggestIssueToHosts() {
 
 // suggestNoMoreIssuesToHosts informs hosts that there are no more Linear issues
 func suggestNoMoreIssuesToHosts() {
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	suggestion := types.IssueSuggestedMessage{
 		Type: types.MessageIssueSuggested,
 		Payload: types.IssueSuggestedPayload{
@@ -846,11 +882,24 @@ func suggestNoMoreIssuesToHosts() {
 
 	byteMessage := messaging.MarshallMessage(suggestion)
 
+	// Copy host list while holding mutex
+	mutex.Lock()
+	hostList := make([]*Client, 0)
 	for client := range clients {
 		if client.IsHost {
-			if err := client.Conn.WriteMessage(websocket.TextMessage, byteMessage); err != nil {
-				log.Printf("Error sending 'no more issues' to host %s: %v", client.UserID, err)
-			}
+			hostList = append(hostList, client)
+		}
+	}
+	mutex.Unlock()
+
+	// Send to hosts without holding mutex
+	for _, client := range hostList {
+		if err := client.WriteMessage(websocket.TextMessage, byteMessage); err != nil {
+			// Access UserID safely for logging (brief lock)
+			mutex.Lock()
+			userID := client.UserID
+			mutex.Unlock()
+			log.Printf("Error sending 'no more issues' to host %s: %v", userID, err)
 		}
 	}
 }
@@ -916,7 +965,7 @@ func handleIssueConfirm(payload types.IssueConfirmPayload, sender *Client) {
 				Payload: "Queue has changed, please refresh",
 			}
 			byteMessage := messaging.MarshallMessage(staleMsg)
-			sender.Conn.WriteMessage(websocket.TextMessage, byteMessage)
+			sender.WriteMessage(websocket.TextMessage, byteMessage)
 			suggestIssueToHost(sender)
 			return
 		}
@@ -1020,9 +1069,24 @@ func broadcastQueueSyncUnlocked() {
 	}
 	byteMessage := messaging.MarshallMessage(syncMsg)
 
+	// Copy client list and UserIDs while holding mutex (caller already holds it)
+	type clientInfo struct {
+		client *Client
+		userID string
+	}
+	clientList := make([]clientInfo, 0, len(clients))
 	for client := range clients {
-		if err := client.Conn.WriteMessage(websocket.TextMessage, byteMessage); err != nil {
-			log.Printf("Error sending queue sync to client %s: %v", client.UserID, err)
+		clientList = append(clientList, clientInfo{
+			client: client,
+			userID: client.UserID,
+		})
+	}
+	// Note: Caller will release mutex after this function returns
+
+	// Send to clients
+	for _, info := range clientList {
+		if err := info.client.WriteMessage(websocket.TextMessage, byteMessage); err != nil {
+			log.Printf("Error sending queue sync to client %s: %v", info.userID, err)
 		}
 	}
 }
@@ -1261,7 +1325,7 @@ func handleAssignEstimate(sender *Client) {
 			Payload: fmt.Sprintf("Failed to assign estimate: %v", err),
 		}
 		byteMessage := messaging.MarshallMessage(errorMsg)
-		sender.Conn.WriteMessage(websocket.TextMessage, byteMessage)
+		sender.WriteMessage(websocket.TextMessage, byteMessage)
 		return
 	}
 
@@ -1278,7 +1342,7 @@ func handleAssignEstimate(sender *Client) {
 	}
 	byteMessage := messaging.MarshallMessage(successMsg)
 	log.Printf("📤 Sending estimateAssignmentSuccess message to host")
-	if err := sender.Conn.WriteMessage(websocket.TextMessage, byteMessage); err != nil {
+	if err := sender.WriteMessage(websocket.TextMessage, byteMessage); err != nil {
 		log.Printf("❌ Error sending estimateAssignmentSuccess: %v", err)
 	}
 }

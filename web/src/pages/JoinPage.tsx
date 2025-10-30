@@ -125,7 +125,10 @@ export const JoinPage = ({ onJoin }: JoinPageProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div
+      className="min-h-screen bg-background flex items-center justify-center p-4"
+      data-testid="join-page"
+    >
       <div className="w-full max-w-sm">
         <div className="text-center mb-6">
           <h1 className="text-2xl font-medium mb-1 text-foreground font-mono tracking-wider uppercase">
@@ -149,6 +152,7 @@ export const JoinPage = ({ onJoin }: JoinPageProps) => {
                 error={!!usernameError}
                 className="px-2 py-1.5"
                 onKeyDown={(e) => e.key === "Enter" && handleConnect()}
+                data-testid="username-input"
               />
               {usernameError && (
                 <div className="mt-1 flex items-start gap-1.5 text-destructive text-xs">
@@ -180,6 +184,7 @@ export const JoinPage = ({ onJoin }: JoinPageProps) => {
                   checked={isHost}
                   onChange={(e) => setIsHost(e.target.checked)}
                   className="w-3 h-3 rounded border-input"
+                  data-testid="host-checkbox"
                 />
                 <div className="flex items-center gap-1.5">
                   <Crown className="w-3 h-3 text-foreground" />
@@ -198,6 +203,7 @@ export const JoinPage = ({ onJoin }: JoinPageProps) => {
               onClick={handleConnect}
               disabled={connecting || !!usernameError}
               className="w-full bg-primary text-primary-foreground font-medium py-3 px-4 rounded-md transition-colors hover:bg-primary/90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              data-testid="join-button"
             >
               {connecting ? (
                 <>

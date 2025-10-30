@@ -17,7 +17,8 @@ export const HostControls = () => {
 
   return (
     <>
-      <Panel title="HOST" className="w-full md:w-80">
+      <div className="w-full md:w-80" data-testid="host-controls">
+        <Panel title="HOST" className="w-full">
         <div className="flex flex-wrap gap-2">
           <Button
             onClick={() => setShowIssuePicker(true)}
@@ -32,6 +33,7 @@ export const HostControls = () => {
               onClick={reveal}
               icon={Eye}
               className="flex-1 min-w-[100px]"
+              data-testid="reveal-button"
             >
               REVEAL
             </Button>
@@ -40,6 +42,7 @@ export const HostControls = () => {
               onClick={clear}
               icon={RotateCcw}
               className="flex-1 min-w-[100px]"
+              data-testid="clear-button"
             >
               CLEAR
             </Button>
@@ -63,7 +66,8 @@ export const HostControls = () => {
             ASSIGN
           </Button>
         </div>
-      </Panel>
+        </Panel>
+      </div>
 
       <IssuePickerModal
         isOpen={showIssuePicker}

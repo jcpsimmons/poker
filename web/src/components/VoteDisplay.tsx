@@ -47,8 +47,9 @@ export const VoteDisplay = () => {
               "flex items-center gap-2 p-1.5 rounded text-xs transition-colors",
               gameState.revealed && "bg-muted"
             )}
+            data-testid="vote-row"
           >
-            <div className="w-28 font-mono text-foreground truncate">
+            <div className="w-28 font-mono text-foreground truncate" data-testid="vote-username">
               {vote.username}
             </div>
             {gameState.revealed ? (

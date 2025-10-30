@@ -14,7 +14,10 @@ interface GamePageProps {
 
 export const GamePage = ({ onLeave }: GamePageProps) => {
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div
+      className="min-h-screen bg-background flex flex-col"
+      data-testid="game-page"
+    >
       <Header onLeave={onLeave} />
       
       <main className="flex-1 flex flex-col items-center px-3 py-3 w-full">

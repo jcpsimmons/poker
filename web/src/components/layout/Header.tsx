@@ -30,7 +30,7 @@ export const Header = ({ onLeave }: HeaderProps) => {
               {gameState.username}
             </span>
             {gameState.isHost && (
-              <Badge variant="primary" className="text-[10px]">
+              <Badge variant="primary" className="text-[10px]" data-testid="host-badge">
                 HOST
               </Badge>
             )}
@@ -61,6 +61,7 @@ export const Header = ({ onLeave }: HeaderProps) => {
             size="sm"
             variant="base"
             className="px-2 py-1 border-border/50 hover:bg-muted"
+            data-testid="leave-button"
           >
             <span className="hidden sm:inline">LEAVE</span>
           </Button>

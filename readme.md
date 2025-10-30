@@ -104,6 +104,60 @@ poker server --linear-cycle https://linear.app/yourorg/team/TEAM/cycle/upcoming
 Hosts get automatic issue suggestions and results are posted back to Linear as comments.
 </details>
 
+## Testing
+
+The project includes comprehensive unit, integration, and end-to-end tests.
+
+### Run Go tests
+
+```bash
+go test ./...
+```
+
+### Run Go tests with race detection
+
+```bash
+go test -race ./...
+```
+
+### Run specific test suites
+
+```bash
+# Validation tests only
+go test ./server/... -run TestValidateUsername
+
+# Join logic tests
+go test ./server/... -run TestHandleJoin
+
+# Race condition tests (may fail - documents current bugs)
+go test ./server/... -run Race
+```
+
+### Run E2E tests (requires server running)
+
+```bash
+# Terminal 1: Start server
+./poker server
+
+# Terminal 2: Run E2E tests
+cd e2e && npm test
+```
+
+### Run all tests in CI mode
+
+```bash
+./test.sh  # Orchestrates Go tests, builds server, runs E2E tests
+```
+
+### Test Coverage
+
+- **20+ unit tests** for username validation
+- **13+ integration tests** for join/disconnect flows
+- **3 race condition tests** documenting concurrency bugs
+- **5 E2E browser tests** for critical user workflows
+
+**Note**: Race condition tests (`TestConcurrentDuplicateUsernameJoin`, `TestConcurrentMultipleHostJoin`) are expected to fail initially as they document race conditions in `isUsernameTaken()` and `hasHost()` helpers. These tests serve as regression tests for future atomic fixes.
+
 ## License
 
 MIT
