@@ -9,11 +9,11 @@ export const NetworkStatus = () => {
   const getStabilityColor = () => {
     switch (computedMetrics.connectionStability) {
       case "STABLE":
-        return "text-green-500";
+        return "text-accent";
       case "UNSTABLE":
-        return "text-yellow-500";
+        return "text-primary";
       case "CRITICAL":
-        return "text-red-500";
+        return "text-destructive";
       default:
         return "text-muted-foreground";
     }
@@ -32,14 +32,28 @@ export const NetworkStatus = () => {
     }
   };
 
-  const bufferStatus = gameState.connected ? "HEALTHY" : "OFFLINE";
-  const bufferColor = gameState.connected ? "text-green-500" : "text-red-500";
+  const getVariant = (): "default" | "hostile" | "task" | "active" => {
+    switch (computedMetrics.connectionStability) {
+      case "STABLE":
+        return "active";
+      case "UNSTABLE":
+        return "task";
+      case "CRITICAL":
+        return "hostile";
+      default:
+        return "default";
+    }
+  };
+
+  const bufferStatus = gameState.connected ? "ONLINE" : "OFFLINE";
+  const bufferColor = gameState.connected ? "text-accent" : "text-destructive";
 
   return (
     <Panel 
-      title="COMMS" 
+      title="NETWORK" 
+      variant={getVariant()}
       className="w-full md:w-1/2 flex flex-col"
-      contentClassName="flex flex-col flex-1"
+      contentClassName="flex flex-col flex-1 p-3"
     >
       <div className="space-y-3">
         <div className="flex items-center justify-between">

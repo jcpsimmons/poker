@@ -2,48 +2,33 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 94.9%;
+    /* Tactical Dark Theme - Always Dark */
+    --background: 0 0% 4%;
+    --foreground: 0 0% 95%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 32 95% 44%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 217 91% 60%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 150 5% 55%;
+    --accent: 142 71% 45%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 15%;
+    --input: 0 0% 12%;
+    --ring: 142 71% 45%;
+    --radius: 0.25rem;
+    
+    /* Tactical Semantic Colors */
+    --tactical-active: 142 71% 45%;
+    --tactical-task: 32 95% 44%;
+    --tactical-hostile: 0 72% 51%;
+    --tactical-toggle: 217 91% 60%;
   }
 }
 
@@ -59,10 +44,10 @@
       sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    /* Very subtle grid background */
+    /* Very subtle tactical grid pattern */
     background-image: 
-      linear-gradient(hsl(var(--border) / 0.05) 1px, transparent 1px),
-      linear-gradient(90deg, hsl(var(--border) / 0.05) 1px, transparent 1px);
+      linear-gradient(hsl(var(--border) / 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.08) 1px, transparent 1px);
     background-size: 20px 20px;
   }
 }
@@ -92,5 +77,18 @@
 
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--muted-foreground) / 0.5);
+  }
+  
+  /* Tactical glow effects */
+  .tactical-glow-active {
+    box-shadow: 0 0 10px hsl(var(--tactical-active) / 0.3);
+  }
+  
+  .tactical-glow-task {
+    box-shadow: 0 0 10px hsl(var(--tactical-task) / 0.3);
+  }
+  
+  .tactical-glow-hostile {
+    box-shadow: 0 0 10px hsl(var(--tactical-hostile) / 0.3);
   }
 }

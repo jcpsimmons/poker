@@ -1,7 +1,7 @@
 import { usePoker } from "../contexts/PokerContext";
 import { cn } from "../lib/utils";
 import { Panel } from "./layout/Panel";
-import { Badge } from "./ui/Badge";
+import { Lock } from "lucide-react";
 
 export const VoteDisplay = () => {
   const { gameState } = usePoker();
@@ -19,14 +19,19 @@ export const VoteDisplay = () => {
     return "█".repeat(barLength);
   };
 
+  const isHost = (username: string) => {
+    return username === gameState.username && gameState.isHost;
+  };
+
   if (gameState.votes.length === 0) {
     return (
       <Panel 
-        title="RESULTS" 
-        className="w-full md:w-80 min-h-[400px] flex flex-col"
-        contentClassName="flex flex-col flex-1"
+        title="VOTES" 
+        count={0}
+        className="w-full md:w-80 flex flex-col"
+        contentClassName="flex flex-col flex-1 p-2"
       >
-        <div className="text-muted-foreground text-xs font-mono text-center flex-1 flex items-center justify-center">
+        <div className="text-muted-foreground text-xs font-mono text-center flex-1 flex items-center justify-center uppercase">
           Waiting for votes...
         </div>
       </Panel>
@@ -35,38 +40,46 @@ export const VoteDisplay = () => {
 
   return (
     <Panel 
-      title="RESULTS" 
+      title="VOTES" 
+      count={gameState.votes.length}
+      variant={gameState.revealed ? "active" : "default"}
       className="w-full md:w-80 flex flex-col"
-      contentClassName="flex flex-col flex-1"
+      contentClassName="flex flex-col flex-1 p-2"
     >
-      <div className="space-y-1.5 flex-1 overflow-y-auto">
+      <div className="space-y-1 flex-1 overflow-y-auto scrollbar-thin">
         {gameState.votes.map((vote, index) => (
           <div
             key={index}
             className={cn(
-              "flex items-center gap-2 p-1.5 rounded text-xs transition-colors",
-              gameState.revealed && "bg-muted"
+              "flex items-center gap-2 p-2 rounded text-xs transition-colors border",
+              gameState.revealed ? "bg-muted/30 border-border" : "bg-transparent border-border/50"
             )}
             data-testid="vote-row"
           >
-            <div className="w-28 font-mono text-foreground truncate" data-testid="vote-username">
-              {vote.username}
+            <div className="flex items-center gap-1.5 w-32">
+              <span className={cn(
+                "text-xs",
+                isHost(vote.username) ? "text-accent" : "text-muted-foreground"
+              )}>●</span>
+              <div className="font-mono text-foreground truncate text-xs uppercase" data-testid="vote-username">
+                {vote.username}
+              </div>
             </div>
             {gameState.revealed ? (
               <>
                 <div className="flex-1">
-                  <div className="text-green-500 font-mono text-xs">
+                  <div className="text-accent font-mono text-xs">
                     {getVoteBar(vote.points)}
                   </div>
                 </div>
-                <div className="text-foreground font-mono w-8 text-right">
+                <div className="text-foreground font-mono w-8 text-right font-bold">
                   {vote.points === "0" ? "NV" : vote.points}
                 </div>
               </>
             ) : (
               <div className="flex-1 flex items-center gap-1.5">
-                <span className="text-primary text-xs">●</span>
-                <span className="text-muted-foreground text-xs font-mono">VOTED</span>
+                <Lock className="w-3 h-3 text-muted-foreground" />
+                <span className="text-muted-foreground text-[10px] font-mono uppercase">Classified</span>
               </div>
             )}
           </div>
@@ -74,10 +87,11 @@ export const VoteDisplay = () => {
       </div>
 
       {gameState.revealed && gameState.averagePoints !== "0" && (
-        <div className="mt-2 p-2">
-          <Badge variant="success" className="w-full text-center block">
-            AVG: {gameState.averagePoints}
-          </Badge>
+        <div className="mt-2 pt-2 border-t border-border">
+          <div className="flex items-center justify-between text-xs font-mono uppercase">
+            <span className="text-muted-foreground">Average</span>
+            <span className="text-accent font-bold text-lg">{gameState.averagePoints}</span>
+          </div>
         </div>
       )}
     </Panel>

@@ -17,7 +17,7 @@ export const HostControls = () => {
   return (
     <>
       <div className="w-full md:w-80" data-testid="host-controls">
-        <Panel title="HOST" className="w-full">
+        <Panel title="CONTROLS" variant="task" className="w-full" contentClassName="p-2">
         <div className="flex flex-wrap gap-2">
           <Button
             onClick={() => {
@@ -39,47 +39,57 @@ export const HostControls = () => {
               }
             }}
             icon={FileEdit}
+            variant="tactical-primary"
+            size="sm"
             className="flex-1 min-w-[100px]"
           >
-            NEXT ISSUE
+            Next Issue
           </Button>
 
           {!gameState.revealed ? (
             <Button
               onClick={reveal}
               icon={Eye}
+              variant="tactical-active"
+              size="sm"
               className="flex-1 min-w-[100px]"
               data-testid="reveal-button"
             >
-              REVEAL
+              Reveal
             </Button>
           ) : (
             <Button
               onClick={clear}
               icon={RotateCcw}
+              variant="tactical-primary"
+              size="sm"
               className="flex-1 min-w-[100px]"
               data-testid="clear-button"
             >
-              CLEAR
+              Clear
             </Button>
           )}
 
           <Button
             onClick={() => setShowStats(true)}
             icon={BarChart3}
+            variant="tactical-toggle"
+            size="sm"
             className="flex-1 min-w-[100px]"
           >
-            STATS
+            Stats
           </Button>
 
           <Button
             onClick={assignEstimate}
             disabled={!gameState.revealed || !gameState.linearIssue}
             icon={CheckCircle2}
+            variant="tactical-active"
+            size="sm"
             className="flex-1 min-w-[100px]"
             title={!gameState.linearIssue ? "No Linear issue active" : !gameState.revealed ? "Reveal votes first" : `Assign ${gameState.averagePoints} points to Linear issue`}
           >
-            ASSIGN
+            Assign
           </Button>
         </div>
         </Panel>

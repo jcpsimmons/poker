@@ -13,9 +13,15 @@ export const TEXT_XS_MONO = "text-xs font-mono";
 export const BORDER_BOTTOM_MUTED = "bg-muted border-b border-border/50";
 
 // Button base classes
-export const BUTTON_BASE = "border border-border/50 bg-transparent hover:bg-foreground hover:text-background text-foreground font-mono text-xs py-2 px-3 rounded transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-foreground";
-export const BUTTON_PRIMARY = "bg-foreground hover:bg-foreground/90 text-background font-mono text-xs py-2 px-4 rounded transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
-export const BUTTON_SECONDARY = "flex-1 border border-border/50 bg-transparent hover:bg-muted text-foreground font-mono text-xs py-2 px-4 rounded transition-all cursor-pointer";
+export const BUTTON_BASE = "border border-border/50 bg-transparent hover:bg-foreground hover:text-background text-foreground font-mono text-xs py-2 px-3 rounded transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-foreground uppercase";
+export const BUTTON_PRIMARY = "bg-foreground hover:bg-foreground/90 text-background font-mono text-xs py-2 px-4 rounded transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed uppercase";
+export const BUTTON_SECONDARY = "flex-1 border border-border/50 bg-transparent hover:bg-muted text-foreground font-mono text-xs py-2 px-4 rounded transition-all cursor-pointer uppercase";
+
+// Tactical button variants
+export const BUTTON_TACTICAL_PRIMARY = "bg-primary hover:bg-primary/90 text-primary-foreground font-mono text-xs py-2 px-4 rounded transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed uppercase font-medium";
+export const BUTTON_TACTICAL_ACTIVE = "bg-accent hover:bg-accent/90 text-accent-foreground font-mono text-xs py-2 px-4 rounded transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed uppercase font-medium";
+export const BUTTON_TACTICAL_HOSTILE = "bg-destructive hover:bg-destructive/90 text-destructive-foreground font-mono text-xs py-2 px-4 rounded transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed uppercase font-medium";
+export const BUTTON_TACTICAL_TOGGLE = "border border-secondary/50 bg-secondary/10 hover:bg-secondary/20 text-secondary font-mono text-xs py-2 px-4 rounded transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed uppercase";
 
 // Input base classes
 export const INPUT_BASE = "w-full bg-background text-foreground border border-border/50 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20 transition-all font-mono disabled:opacity-50 disabled:cursor-not-allowed";

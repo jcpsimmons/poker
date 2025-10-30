@@ -1,10 +1,18 @@
 import { type ReactNode } from "react";
 import { cn } from "../../lib/utils";
-import { BUTTON_BASE, BUTTON_PRIMARY, BUTTON_SECONDARY } from "../../lib/classNames";
+import { 
+  BUTTON_BASE, 
+  BUTTON_PRIMARY, 
+  BUTTON_SECONDARY,
+  BUTTON_TACTICAL_PRIMARY,
+  BUTTON_TACTICAL_ACTIVE,
+  BUTTON_TACTICAL_HOSTILE,
+  BUTTON_TACTICAL_TOGGLE
+} from "../../lib/classNames";
 import type { LucideIcon } from "lucide-react";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "base";
+  variant?: "primary" | "secondary" | "base" | "tactical-primary" | "tactical-active" | "tactical-hostile" | "tactical-toggle";
   size?: "sm" | "md" | "lg";
   icon?: LucideIcon;
   iconPosition?: "left" | "right";
@@ -25,6 +33,10 @@ export const Button = ({
     variant === "primary" && BUTTON_PRIMARY,
     variant === "secondary" && BUTTON_SECONDARY,
     variant === "base" && BUTTON_BASE,
+    variant === "tactical-primary" && BUTTON_TACTICAL_PRIMARY,
+    variant === "tactical-active" && BUTTON_TACTICAL_ACTIVE,
+    variant === "tactical-hostile" && BUTTON_TACTICAL_HOSTILE,
+    variant === "tactical-toggle" && BUTTON_TACTICAL_TOGGLE,
     size === "sm" && "text-[10px] py-1 px-2",
     size === "md" && "text-xs py-2 px-3",
     size === "lg" && "text-sm py-3 px-4",

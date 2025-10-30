@@ -55,11 +55,11 @@ export const Queue = () => {
 
   return (
     <>
-      <Panel title="VOTING QUEUE" className="w-full">
+      <Panel title="QUEUE" count={queueItems.length} className="w-full" contentClassName="p-2">
         <div className="flex flex-col gap-2">
           <div className="max-h-[400px] overflow-y-auto space-y-2 pr-1 scrollbar-thin">
             {queueItems.length === 0 ? (
-              <div className="text-xs font-mono text-muted-foreground text-center py-4">
+              <div className="text-xs font-mono text-muted-foreground text-center py-4 uppercase">
                 Queue is empty
               </div>
             ) : (
@@ -74,8 +74,8 @@ export const Queue = () => {
                     onDrop={(e) => handleDrop(e, index)}
                     className={`
                       flex items-center gap-2 p-2 rounded border
-                      ${isCurrent ? "bg-primary/10 border-primary/50" : "bg-muted/50 border-border/50"}
-                      ${isHost ? "cursor-move hover:bg-muted/80" : ""}
+                      ${isCurrent ? "bg-accent/10 border-accent/50" : "bg-muted/30 border-border"}
+                      ${isHost ? "cursor-move hover:bg-muted/50" : ""}
                       transition-colors
                     `}
                   >
@@ -84,17 +84,17 @@ export const Queue = () => {
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-mono text-foreground font-medium">
+                        <Badge variant="task" className="text-[10px]">
                           {item.identifier}
-                        </span>
+                        </Badge>
                         {item.source === "linear" && (
                           <Badge variant="info" className="text-[10px]">
-                            LINEAR
+                            Linear
                           </Badge>
                         )}
                         {isCurrent && (
-                          <Badge variant="primary" className="text-[10px]">
-                            CURRENT
+                          <Badge variant="active" className="text-[10px]">
+                            Active
                           </Badge>
                         )}
                       </div>
@@ -106,22 +106,22 @@ export const Queue = () => {
                       <div className="flex items-center gap-1 flex-shrink-0">
                         <Button
                           onClick={() => handleLoadIssue(item)}
-                          variant="primary"
+                          variant="tactical-active"
                           size="sm"
                           title="Load this issue"
                         >
-                          LOAD
+                          Load
                         </Button>
                         <button
                           onClick={() => setEditingItem(item.id)}
-                          className="p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                          className="p-1 text-muted-foreground hover:text-secondary transition-colors cursor-pointer"
                           title="Edit item"
                         >
                           <Edit2 className="w-3 h-3" />
                         </button>
                         <button
                           onClick={() => deleteQueueItem(item.id)}
-                          className="p-1 text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
+                          className="p-1 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
                           title="Delete item"
                         >
                           <Trash2 className="w-3 h-3" />
@@ -137,9 +137,11 @@ export const Queue = () => {
             <Button
               onClick={() => setShowAddModal(true)}
               icon={Plus}
-              className="w-full flex-shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              variant="tactical-toggle"
+              size="sm"
+              className="w-full flex-shrink-0"
             >
-              ADD TO QUEUE
+              Add to Queue
             </Button>
           )}
         </div>
