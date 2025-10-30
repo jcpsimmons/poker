@@ -2,7 +2,6 @@ import { usePoker } from "../contexts/PokerContext";
 import { ESTIMATE_OPTIONS } from "../types/poker";
 import { cn } from "../lib/utils";
 import { Panel } from "./layout/Panel";
-import { Badge } from "./ui/Badge";
 import { Check } from "lucide-react";
 
 export const EstimateSelector = () => {
